@@ -3,12 +3,6 @@ Enterprise-Ready AI Agent Lab - Combining Intelligence and Governance for busine
 
 This hands-on lab provides a guided walkthrough that teaches how to build autonomous AI assistants deployed in user-managed hardware, how to connect those agents to key tools and define its harness or capability perimeter, and how to govern the agent through Microsoft Agent 365.
 
-## Quick Start: Phase 1 - Building Autonomous AI Assistant
-
-Start with Phase 1 to learn how to build a personal AI assistant:
-
-👉 **[Phase 1 Guide](./phase-1-building-autonomous-ai-assistant/PHASE_1_GUIDE.md)**
-
 ### What You'll Learn
 - How autonomous AI agents work
 - Setting up OpenClaw on your hardware
@@ -18,23 +12,11 @@ Start with Phase 1 to learn how to build a personal AI assistant:
 - Implementing memory systems
 - Defining capability perimeters
 
-### Quick Setup
-```bash
-# Install OpenClaw
-npm install -g openclaw@latest
-
-# Interactive setup
-openclaw onboard --install-daemon
-
-# Test your agent
-openclaw agent --message "Hello!"
-```
-
 ## Lab Structure
 
 This lab is organized into phases:
 
-### Phase 1: Building Autonomous AI Assistant ✨ **START HERE**
+### Phase 1: Building Autonomous AI Assistant
 - **Duration**: 10-17 hours
 - **Focus**: Core agent architecture and capabilities
 - **Path**: [phase-1-building-autonomous-ai-assistant/](./phase-1-building-autonomous-ai-assistant/)
