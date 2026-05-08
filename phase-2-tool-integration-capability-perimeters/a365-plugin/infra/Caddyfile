@@ -1,0 +1,20 @@
+# Reference Caddyfile (for documentation / local dev).
+#
+# The actual Caddyfile installed on the Azure VM is templated inside
+# infra/cloud-init.yaml — Bicep substitutes __DNS_LABEL__ before the VM
+# boots. This file mirrors that contents for code review and for local
+# Caddy testing.
+
+openclaw-<suffix>.swedencentral.cloudapp.azure.com {
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:3978 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+    }
+
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}

@@ -1,0 +1,89 @@
+# Capability Perimeter — Phase 1 baseline
+#
+# Loaded at container startup. Defines what the agent can do, who can ask it
+# to do those things, and which actions need owner approval.
+#
+# Phase 1 only enforces: NETWORK_MODE (via iptables in src/outbound.ts) and
+# the role-based read/write split on Graph tools. The richer fields below
+# (rate_limit, approval, redact_args) are honored by Phase 2's enforcer once
+# we add src/perimeter/. They are present here so Phase 1 → Phase 2 is a
+# pure code change without doc churn.
+#
+# See:
+#   - phase-2-tool-integration-and-perimeters/PHASE_2_GUIDE.md
+#   - src/outbound.ts (Phase 1 network policy enforcement)
+#   - src/perimeter/enforcer.ts (Phase 2 — tool-level enforcement)
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# Network policy — enforced by iptables in the container at boot.
+#   unrestricted | restricted | allowlist
+# In "restricted" mode, only essential Microsoft auth / Graph / Bot Framework
+# domains plus the configured LLM provider are reachable. In "allowlist" we
+# extend that with the domains listed below.
+# ---------------------------------------------------------------------------
+network:
+  mode: restricted
+  allowlist: []                    # populated for Phase 2 (Jira, MS Learn MCP, etc.)
+
+# ---------------------------------------------------------------------------
+# Tool catalog — every tool the LLM may call is registered here.
+# Phase 1 only defines the Graph tools shipped by upstream src/graph-tools.ts.
+# Phase 2 adds Jira + Microsoft MCP entries below.
+#
+# Schema:
+#   roles:        which UserRoles may invoke (Owner, Requester)
+#   rate_limit:   token-bucket per (user, tool); honored by Phase 2 enforcer
+#   approval:     never | always | { when: <expression> }
+#   redact_args:  args removed/hashed before audit logging
+# ---------------------------------------------------------------------------
+tools:
+  graph.calendar.read:
+    enabled: true
+    roles: [Owner, Requester]
+    rate_limit: { per: minute, max: 30 }
+    approval: never
+
+  graph.calendar.write:           # create / update / delete events
+    enabled: true
+    roles: [Owner]
+    rate_limit: { per: minute, max: 10 }
+    approval: never               # Phase 2 may flip this to "always" for high-risk envs
+
+  graph.email.send:
+    enabled: true
+    roles: [Owner]
+    rate_limit: { per: hour, max: 20 }
+    approval:
+      when: "to_domain not in [yourtenant.onmicrosoft.com]"
+    redact_args: [body, subject]
+
+  graph.user.lookup:
+    enabled: true
+    roles: [Owner, Requester]
+    rate_limit: { per: minute, max: 60 }
+    approval: never
+
+  graph.find_meeting_times:
+    enabled: true
+    roles: [Owner, Requester]
+    rate_limit: { per: minute, max: 20 }
+    approval: never
+
+# ---------------------------------------------------------------------------
+# Defaults applied when a tool config doesn't specify a value.
+# ---------------------------------------------------------------------------
+defaults:
+  approval_timeout_minutes: 10
+  on_timeout: deny
+  audit: full                    # "full" | "redacted" | "off"
+  unknown_tool_policy: deny      # if LLM tries to call a tool not in the catalog
+
+# ---------------------------------------------------------------------------
+# DM policy hint (mirrors DM_POLICY env var; documented here for completeness).
+# Actual enforcement lives in src/channel.ts.
+# ---------------------------------------------------------------------------
+dm_policy:
+  mode: pairing                  # open | pairing | closed
+  pairing_code_ttl_minutes: 30
