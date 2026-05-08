@@ -145,6 +145,45 @@ The `openclaw-a365` plugin already implements the core mechanics of the Microsof
 
 > **Official reference**: [learn.microsoft.com/en-us/microsoft-agent-365/developer/](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/)
 
+> **AI-guided setup**: Open this repo in Claude Code or GitHub Copilot CLI and say _"Set up the Enterprise AI Agent Lab Phase 2"_. The AI reads [`CodingAgent.md`](../../CodingAgent.md) and walks you through every step automatically — the same pattern used by the official Agent 365 [`aka.ms/agent365enable`](https://aka.ms/agent365enable) instruction file.
+
+---
+
+### Agent 365 SDK Architecture
+
+The Agent 365 SDK is **not** an agent framework — it layers enterprise capabilities on top of agents you have already built, regardless of the underlying stack.
+
+| Layer | Role | Provided by |
+|-------|------|-------------|
+| **Enterprise Capabilities** | Identity, notifications, observability, governed tooling | Agent 365 SDK |
+| **Agent Logic** | Prompts, workflows, reasoning | Your implementation (this lab) |
+| **LLM Orchestrator Runtime** | Model invocation, tool orchestration | OpenClaw + your chosen LLM |
+
+Supported agent platforms: Copilot Studio, Azure AI Foundry, Microsoft Agent Framework, **Claude Code SDK**, OpenAI Agents SDK, LangChain — and any custom code including this lab.
+
+---
+
+### Agent 365 CLI — Installation
+
+The `a365` CLI automates the full development lifecycle: blueprint setup, identity configuration, MCP integration, Azure deployment, and admin center publishing.
+
+```bash
+# Install via npm
+npm install -g @microsoft/agent365-cli
+
+# Or via winget (Windows)
+winget install Microsoft.Agent365CLI
+
+# Verify installation
+a365 --version
+
+# Authenticate (uses az login context)
+az login
+a365 setup -h
+```
+
+> **Permissions required**: Global Administrator **or** Agent ID Developer role in your Entra tenant, plus Azure subscription contributor access.
+
 ---
 
 ### Agent Identity
@@ -338,6 +377,22 @@ a365 cleanup blueprint --endpoint-only
 
 > **Note:** Work IQ MCP servers require a **Microsoft 365 Copilot license**.
 
+#### One-time tenant setup (Global Administrator, run once per tenant)
+
+Before any agent in your tenant can call Work IQ MCP servers, a Global Administrator must register the Agent 365 Tools service principal:
+
+```bash
+# Download and run the one-time setup script
+# Source: https://github.com/microsoft/Agent365-devTools/blob/main/scripts/cli/Auth/New-Agent365ToolsServicePrincipalProdPublic.ps1
+
+# PowerShell (Windows / pwsh on Mac/Linux)
+.\New-Agent365ToolsServicePrincipalProdPublic.ps1
+# Sign in with Global Admin credentials when prompted.
+# This is a one-time operation per tenant.
+```
+
+After this runs, your tenant is ready for MCP server configuration and any developer in the tenant can start adding MCP servers to their agents.
+
 #### Add MCP servers to your agent
 
 ```bash
@@ -482,6 +537,25 @@ runWithGraphToolContext({
 });
 ```
 
+#### Identify the sender (all message types)
+
+Every activity — conversation messages AND notification callbacks — includes a pre-populated `activity.from` object. No Graph API call needed:
+
+```typescript
+// Works in any handler: message, notification, invoke
+const sender = context.activity.from;
+console.log(`From: ${sender.name} (UPN: ${sender.id}, AAD OID: ${sender.aadObjectId})`);
+
+// Use aadObjectId with Graph API to fetch full profile (job title, manager, dept)
+// if your agent has User.Read.All permission
+```
+
+| `from` property | Value |
+|---|---|
+| `name` | Display name (user-controlled — sanitise before LLM injection) |
+| `id` | Channel user ID / UPN |
+| `aadObjectId` | Microsoft Entra Object ID |
+
 #### Agent 365 SDK approach (official)
 
 The official SDK adds typed routing via `AgentApplication` with per-activity-type handlers:
@@ -520,6 +594,46 @@ The Agent 365 SDK lets your agent **receive push notifications** from Microsoft 
 | **Lifecycle: UserIdentityCreated** | Agent user identity created | N/A |
 | **Lifecycle: WorkloadOnboardingUpdated** | Agent user workload onboarding status changed | N/A |
 | **Lifecycle: UserDeleted** | Agent user identity deleted | N/A |
+
+#### Notification payload reference
+
+Each notification type carries structured data in `Activity.entities`. Key fields by type:
+
+**Email notification** — `notification.emailNotification`
+
+```json
+{
+  "type": "emailNotification",
+  "id": "<email-id>",
+  "conversationId": "<thread-id>",
+  "htmlBody": "<body dir=\"ltr\"><div>Email body content here</div></body>"
+}
+```
+
+The activity also carries `from.name` (sender display name), `from.id` (sender UPN), and `from.aadObjectId` (Entra Object ID) — pre-populated by the Agent 365 platform, no extra Graph calls needed.
+
+**Document comment notification** — `notification.wpxCommentNotification` (Word / Excel / PowerPoint)
+
+```json
+{
+  "type": "wpxcomment",
+  "parentCommentId": "<parent-id>",
+  "commentId": "<comment-id>",
+  "documentId": "<doc-id>"
+}
+```
+
+The `activity.attachments[0].contentUrl` contains the document URL; `activity.channelData.productContext` is `"Word"`, `"Excel"`, or `"PowerPoint"`.
+
+**Lifecycle notification** — `notification.lifecycleEvent`
+
+| `lifecycleEventType` | Meaning |
+|---|---|
+| `agenticUserIdentityCreated` | Agent user mailbox + presence provisioned |
+| `agenticUserWorkloadOnboardingUpdated` | License workload (Teams, Mail, etc.) now ready |
+| `agenticUserDeleted` | Agent user removed — clean up state |
+
+> **Security note**: `Activity.From.Name` is user-controlled text. Always sanitise it (strip control characters, enforce max length) before injecting into LLM system prompts to prevent prompt injection.
 
 #### Add notification handling (Node.js / TypeScript)
 

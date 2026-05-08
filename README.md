@@ -52,24 +52,45 @@ Before starting, ensure you have:
 
 ## Quick Start
 
-### Start with Phase 1 (recommended)
+### AI-guided setup (recommended — Claude Code or GitHub Copilot CLI)
 
-```bash
-# Open the Phase 1 guide
-open phase-1-building-autonomous-ai-assistant/README.md
+Open this repo in Claude Code, GitHub Copilot, or any AI coding agent and say:
+
+```
+Set up the Enterprise AI Agent Lab Phase 1
 ```
 
-Phase 1 Module 1 starts with architecture — no prerequisites beyond Node.js.
+The AI reads [`CLAUDE.md`](./CLAUDE.md) (and [`.github/copilot-instructions.md`](./.github/copilot-instructions.md) for GitHub Copilot) and walks you through every step — prerequisites, configuration, deployment, and verification.
 
-### Jump to Phase 2 (if you have M365 infrastructure)
+### Manual start — Phase 1
 
 ```bash
-# Open the Phase 2 guide
-open phase-2-tool-integration-capability-perimeters/README.md
+# 1. Check prerequisites
+./scripts/preflight.sh --phase 1
 
-# Copy and configure the environment
+# 2. Run the interactive setup wizard
+./scripts/phase1-setup.sh
+
+# 3. Start the gateway
+openclaw gateway
+```
+
+### Manual start — Phase 2 (requires Azure subscription + M365 tenant)
+
+```bash
+# 1. Check prerequisites (includes Azure CLI check)
+./scripts/preflight.sh --phase 2
+
+# 2. Automate Entra / app registration via Azure CLI
 cd phase-2-tool-integration-capability-perimeters/a365-plugin
-cp .env.example .env
+../../scripts/az-entra-setup.sh        # pauses at Step 4 for M365 portal
+
+# 3. Start locally, then deploy to Azure
+docker compose up -d
+./infra/deploy.sh dev                  # Azure VM deploy (~10 min, ~$65/mo)
+
+# 4. Verify everything
+../../scripts/verify.sh --phase 2
 ```
 
 ---
@@ -80,9 +101,17 @@ cp .env.example .env
 enterprise-ai-agent-lab/
 │
 ├── README.md                              ← this file
+├── CodingAgent.md                         ← AI-guided setup for Claude Code / Copilot CLI
 ├── OPENCLAW_ARCHITECTURE.md               ← platform architecture reference
 ├── OPENCLAW_SETUP_GUIDE.md                ← installation & configuration reference
 ├── OPENCLAW_IMPLEMENTATION_GUIDE.md       ← patterns & best practices
+├── .github/
+│   └── copilot-instructions.md           ← GitHub Copilot CLI instructions
+├── scripts/
+│   ├── preflight.sh                       ← check prerequisites for any phase
+│   ├── phase1-setup.sh                    ← interactive Phase 1 wizard
+│   ├── az-entra-setup.sh                  ← Azure CLI automation for Phase 2 Entra
+│   └── verify.sh                          ← post-deployment health checks
 │
 ├── phase-1-building-autonomous-ai-assistant/
 │   ├── README.md                          ← 7-module Phase 1 guide ← START HERE
