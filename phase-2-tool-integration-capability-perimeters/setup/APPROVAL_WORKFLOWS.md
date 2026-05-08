@@ -155,7 +155,7 @@ The agent can automatically restrict availability to business hours:
 ```env
 BUSINESS_HOURS_START=08:00
 BUSINESS_HOURS_END=18:00
-BUSINESS_HOURS_TIMEZONE=America/Los_Angeles
+TIMEZONE=America/Los_Angeles
 ```
 
 Outside business hours:

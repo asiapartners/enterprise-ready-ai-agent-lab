@@ -58,7 +58,7 @@ The script:
 Watch the VM finish provisioning:
 
 ```bash
-az vm get-instance-view -g rg-openclaw-lab-dev -n openclaw-vm --query "instanceView.statuses[?code=='ProvisioningState/succeeded']"
+az vm get-instance-view -g rg-openclaw-lab-dev -n openclaw-vm-dev --query "instanceView.statuses[?code=='ProvisioningState/succeeded']"
 ```
 
 Tail the cloud-init log:
@@ -127,19 +127,19 @@ cd /opt/openclaw && git pull && sudo docker compose pull && sudo docker compose 
 az keyvault secret set --vault-name openclaw-kv-<suffix> \
   --name A365_APP_PASSWORD --value '<new>'
 # 3. Restart VM (cloud-init re-runs and pulls new value)
-az vm restart -g rg-openclaw-lab-dev -n openclaw-vm
+az vm restart -g rg-openclaw-lab-dev -n openclaw-vm-dev
 ```
 
 ### Stop billing while not using
 
 ```bash
-az vm deallocate -g rg-openclaw-lab-dev -n openclaw-vm
+az vm deallocate -g rg-openclaw-lab-dev -n openclaw-vm-dev
 ```
 
 The static Public IP keeps the FQDN reserved (~$3/month). To resume:
 
 ```bash
-az vm start -g rg-openclaw-lab-dev -n openclaw-vm
+az vm start -g rg-openclaw-lab-dev -n openclaw-vm-dev
 ```
 
 ### Tear down completely

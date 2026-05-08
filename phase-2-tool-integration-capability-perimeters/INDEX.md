@@ -15,6 +15,7 @@ phase-2-tool-integration-capability-perimeters/
 ├── setup/                       ← step-by-step configuration guides
 │   ├── AZURE_ENTRA_SETUP.md     ← Module 2: create Entra ID credentials
 │   ├── M365_AGENTS_SETUP.md     ← Module 3: register bot in Teams
+│   ├── AGENT_365_SDK_INTEGRATION.md  ← Module 4: wire Agent 365 SDK into OpenClaw
 │   ├── GRAPH_API_TOOLS.md       ← Module 4: all 8 Graph tools reference
 │   ├── NETWORK_POLICY.md        ← Module 5: iptables network perimeters
 │   └── APPROVAL_WORKFLOWS.md    ← Module 5: safety boundaries & HITL
@@ -68,6 +69,7 @@ phase-2-tool-integration-capability-perimeters/
 | Add Work IQ / MCP tooling servers | [README.md — Tooling Servers](./README.md#tooling-servers-work-iq-mcp) |
 | Handle messages in your agent | [README.md — Handle Messages](./README.md#handle-messages) |
 | Receive notifications (email, docs) | [README.md — Notify Agents](./README.md#notify-agents) |
+| **Wire the Agent 365 SDK into OpenClaw (code-level)** | [setup/AGENT_365_SDK_INTEGRATION.md](./setup/AGENT_365_SDK_INTEGRATION.md) |
 
 ---
 
@@ -90,6 +92,7 @@ Module 3: Deploy
 Module 4: Graph Tools
   README.md → Modules table (row 4)
   setup/GRAPH_API_TOOLS.md (tool reference)
+  setup/AGENT_365_SDK_INTEGRATION.md (Agent 365 SDK integration — packages, MCP, notifications)
   a365-plugin/src/graph-tools.ts (source)
 
 Module 5: Capability Perimeters

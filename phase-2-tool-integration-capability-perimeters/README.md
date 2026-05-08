@@ -133,6 +133,7 @@ The three enforcement modes:
 | [`setup/AZURE_ENTRA_SETUP.md`](./setup/AZURE_ENTRA_SETUP.md) | Entra ID: Agentic User, App Registration, FIC, AA Instance ID |
 | [`setup/AZURE_VM_DEPLOY.md`](./setup/AZURE_VM_DEPLOY.md) | Azure VM deployment with Caddy, Key Vault, Managed Identity (~$65/mo) |
 | [`setup/M365_AGENTS_SETUP.md`](./setup/M365_AGENTS_SETUP.md) | M365 Agents channel registration and Teams setup |
+| [`setup/AGENT_365_SDK_INTEGRATION.md`](./setup/AGENT_365_SDK_INTEGRATION.md) | **Wiring the Agent 365 SDK into OpenClaw — packages, notification handlers, MCP tools, blueprint paths** |
 | [`setup/GRAPH_API_TOOLS.md`](./setup/GRAPH_API_TOOLS.md) | All 8 Graph tools reference + example prompts |
 | [`setup/NETWORK_POLICY.md`](./setup/NETWORK_POLICY.md) | Capability perimeters via iptables |
 | [`setup/APPROVAL_WORKFLOWS.md`](./setup/APPROVAL_WORKFLOWS.md) | Adaptive Card approval gates + human-in-the-loop |
@@ -142,6 +143,8 @@ The three enforcement modes:
 ## Microsoft Agent 365 SDK — Concepts & Integration
 
 The `openclaw-a365` plugin already implements the core mechanics of the Microsoft Agent 365 SDK by hand — FIC tokens, Bot Framework messaging, proactive send. This section maps the official Agent 365 SDK vocabulary to what we've built, adds the concepts not yet covered (tooling servers, notifications, blueprint CLI), and gives you the reference you need when expanding or migrating to the official SDK.
+
+> **For the actual code-level integration steps** — installing the SDK packages, wiring notification handlers into `src/monitor.ts`, registering Work IQ MCP tools alongside the existing direct-Graph tools, and choosing between manual Entra setup vs. `a365 setup all` — see **[`setup/AGENT_365_SDK_INTEGRATION.md`](./setup/AGENT_365_SDK_INTEGRATION.md)**.
 
 > **Official reference**: [learn.microsoft.com/en-us/microsoft-agent-365/developer/](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/)
 
@@ -281,7 +284,7 @@ a365 setup all --aiteammate
 ```bash
 a365 setup permissions custom \
   --resource-app-id 00000003-0000-0000-c000-000000000000 \
-  --scopes Mail.Read,Mail.Send,Calendars.ReadWrite,User.Read.All
+  --scopes Mail.Read.Shared,Mail.Send.Shared,Calendars.ReadWrite.Shared,User.Read.All
 ```
 
 #### Verify setup

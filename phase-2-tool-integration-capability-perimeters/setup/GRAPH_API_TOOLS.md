@@ -17,12 +17,12 @@ All tools require:
 
 | Tool | Graph API | Permissions Required |
 |------|-----------|---------------------|
-| `get_calendar_events` | `GET /users/{id}/calendar/events` | `Calendars.ReadWrite` |
-| `create_calendar_event` | `POST /users/{id}/calendar/events` | `Calendars.ReadWrite` |
-| `update_calendar_event` | `PATCH /users/{id}/calendar/events/{id}` | `Calendars.ReadWrite` |
-| `delete_calendar_event` | `DELETE /users/{id}/calendar/events/{id}` | `Calendars.ReadWrite` |
-| `find_meeting_times` | `POST /users/{id}/findMeetingTimes` | `Calendars.ReadWrite` |
-| `send_email` | `POST /users/{agent}/sendMail` | `Mail.Send` |
+| `get_calendar_events` | `GET /users/{id}/calendar/events` | `Calendars.ReadWrite.Shared` |
+| `create_calendar_event` | `POST /users/{id}/calendar/events` | `Calendars.ReadWrite.Shared` |
+| `update_calendar_event` | `PATCH /users/{id}/calendar/events/{id}` | `Calendars.ReadWrite.Shared` |
+| `delete_calendar_event` | `DELETE /users/{id}/calendar/events/{id}` | `Calendars.ReadWrite.Shared` |
+| `find_meeting_times` | `POST /users/{id}/findMeetingTimes` | `Calendars.ReadWrite.Shared` |
+| `send_email` | `POST /users/{agent}/sendMail` | `Mail.Send.Shared` |
 | `get_user_info` | `GET /users/{id}` | `User.Read.All` |
 | `send_gif` | Klipy API + `sendActivity` | `KLIPY_API_KEY` env var |
 

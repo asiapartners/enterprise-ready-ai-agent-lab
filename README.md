@@ -10,7 +10,7 @@ A hands-on lab for building production-ready autonomous AI agents — from your 
 |-------|-------|----------|--------|
 | **Phase 1** | [Building Autonomous AI Assistants](./phase-1-building-autonomous-ai-assistant/README.md) | 10–17 hours | ✅ Active |
 | **Phase 2** | [Tool Integration & Capability Perimeters](./phase-2-tool-integration-capability-perimeters/README.md) | ~23 hours | ✅ Active |
-| **Phase 3** | [Multi-Agent Orchestration & Governance](./phase-3-multi-agent-orchestration-governance/README.md) | Coming soon | 🔜 Planned |
+| **Phase 3** | [Multi-Agent Orchestration & Governance](./phase-3-multi-agent-orchestration-governance/README.md) | ~39 hours | 🔜 Planned |
 
 ---
 
@@ -64,6 +64,8 @@ The AI reads [`CodingAgent.md`](./CodingAgent.md) and walks you through every st
 
 ### Manual start — Phase 1
 
+> Run all `./scripts/*.sh` commands **from the repo root**.
+
 ```bash
 # 1. Check prerequisites
 ./scripts/preflight.sh --phase 1
@@ -77,20 +79,27 @@ openclaw gateway
 
 ### Manual start — Phase 2 (requires Azure subscription + M365 tenant)
 
+> Run all `./scripts/*.sh` commands **from the repo root**.
+
 ```bash
 # 1. Check prerequisites (includes Azure CLI check)
 ./scripts/preflight.sh --phase 2
 
 # 2. Automate Entra / app registration via Azure CLI
-cd phase-2-tool-integration-capability-perimeters/a365-plugin
-../../scripts/az-entra-setup.sh        # pauses at Step 4 for M365 portal
+./scripts/az-entra-setup.sh \
+  --env-file phase-2-tool-integration-capability-perimeters/a365-plugin/.env.generated
+# pauses at Step 4 for M365 portal — script guides you through it
 
-# 3. Start locally, then deploy to Azure
+# 3. Merge generated values, then start locally and deploy
+cd phase-2-tool-integration-capability-perimeters/a365-plugin
+cp .env.example .env
+cat .env.generated >> .env             # then dedupe duplicate keys in .env
 docker compose up -d
 ./infra/deploy.sh dev                  # Azure VM deploy (~10 min, ~$65/mo)
 
-# 4. Verify everything
-../../scripts/verify.sh --phase 2
+# 4. Verify everything (from repo root)
+cd -
+./scripts/verify.sh --phase 2
 ```
 
 ---
@@ -160,6 +169,11 @@ enterprise-ai-agent-lab/
 
 | Document | Purpose |
 |---------|---------|
+| [CodingAgent.md](./CodingAgent.md) | AI-guided setup reference for Claude Code / Copilot CLI |
+| [.github/copilot-instructions.md](./.github/copilot-instructions.md) | Condensed reference card for GitHub Copilot |
+| [phase-1-.../README.md](./phase-1-building-autonomous-ai-assistant/README.md) | Phase 1 — 7-module learning guide |
+| [phase-2-.../README.md](./phase-2-tool-integration-capability-perimeters/README.md) | Phase 2 — 5-module guide + Agent 365 SDK reference |
+| [phase-3-.../README.md](./phase-3-multi-agent-orchestration-governance/README.md) | Phase 3 — multi-agent orchestration spec |
 | [OPENCLAW_ARCHITECTURE.md](./OPENCLAW_ARCHITECTURE.md) | Platform architecture deep-dive |
 | [OPENCLAW_SETUP_GUIDE.md](./OPENCLAW_SETUP_GUIDE.md) | Installation & channel setup reference |
 | [OPENCLAW_IMPLEMENTATION_GUIDE.md](./OPENCLAW_IMPLEMENTATION_GUIDE.md) | Patterns, multi-agent, plugin development |

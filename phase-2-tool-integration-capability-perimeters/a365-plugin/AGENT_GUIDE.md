@@ -218,6 +218,7 @@ See [`setup/AZURE_VM_DEPLOY.md`](../setup/AZURE_VM_DEPLOY.md) for the full deplo
 - [setup/AZURE_ENTRA_SETUP.md](../setup/AZURE_ENTRA_SETUP.md) — Entra ID: Agentic User, App Registration, FIC, AA Instance ID
 - [setup/AZURE_VM_DEPLOY.md](../setup/AZURE_VM_DEPLOY.md) — Azure VM deploy with Caddy, Key Vault, Managed Identity (~$65/mo)
 - [setup/M365_AGENTS_SETUP.md](../setup/M365_AGENTS_SETUP.md) — M365 Agents portal setup and Teams channel
+- [setup/AGENT_365_SDK_INTEGRATION.md](../setup/AGENT_365_SDK_INTEGRATION.md) — Wire the Agent 365 SDK into this plugin: packages, notification handlers, MCP tooling
 - [setup/GRAPH_API_TOOLS.md](../setup/GRAPH_API_TOOLS.md) — All 8 Graph tools reference + example prompts
 - [setup/NETWORK_POLICY.md](../setup/NETWORK_POLICY.md) — Capability perimeters via iptables
 - [setup/APPROVAL_WORKFLOWS.md](../setup/APPROVAL_WORKFLOWS.md) — Human-in-the-loop safety boundaries

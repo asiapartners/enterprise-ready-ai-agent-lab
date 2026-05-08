@@ -109,7 +109,7 @@ securityContext:
 
 **Fix**:
 1. Go to Azure Portal → App registrations → your app → API permissions
-2. Confirm `Calendars.ReadWrite`, `Mail.Send`, `User.Read.All` are listed
+2. Confirm `Calendars.ReadWrite.Shared`, `Mail.Send.Shared`, `User.Read.All` are listed
 3. Click **Grant admin consent for [your org]**
 4. Wait 5 minutes and retry
 
@@ -246,7 +246,7 @@ Get a key at https://partner.klipy.com/api-keys
 
 Set the correct timezone in your `.env`:
 ```env
-BUSINESS_HOURS_TIMEZONE=America/Los_Angeles
+TIMEZONE=America/Los_Angeles
 ```
 
 Ensure you're passing IANA timezone names (not Windows timezone names):

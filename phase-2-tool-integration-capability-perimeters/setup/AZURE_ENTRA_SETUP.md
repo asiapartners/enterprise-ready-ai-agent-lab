@@ -5,7 +5,18 @@
 
 This guide covers both the **portal UI** path (recommended for first-time setup — every screen surfaces concepts the lab teaches) and an **Azure CLI** path for automation and repeatability.
 
-> **Automate everything:** Run `../../scripts/az-entra-setup.sh` from the `a365-plugin/` directory to execute Steps 1–3 and 5–6 via CLI. Step 4 (AA Instance ID) always requires the M365 Agents portal. The script pauses, guides you through it, then continues.
+> **Automate everything:** From the **repo root**, run:
+> ```bash
+> ./scripts/az-entra-setup.sh \
+>   --env-file phase-2-tool-integration-capability-perimeters/a365-plugin/.env.generated
+> ```
+> This executes Steps 1–3 and 5–6 via CLI and writes the values straight into `a365-plugin/.env.generated`. Step 4 (AA Instance ID) always requires the M365 Agents portal — the script pauses, guides you through it, then continues. After the script finishes:
+> ```bash
+> cd phase-2-tool-integration-capability-perimeters/a365-plugin
+> cp .env.example .env                 # if not already created
+> cat .env.generated >> .env           # append generated values
+> # then dedupe duplicate keys (the appended values are correct — keep them)
+> ```
 
 ## Prerequisites
 
@@ -82,7 +93,7 @@ This is the OAuth client the bot framework uses to authenticate **into** Microso
    - **Application (client) ID** → `.env` → `A365_APP_ID`
    - **Directory (tenant) ID** → `.env` → `A365_TENANT_ID`
 5. **Certificates & secrets** → **+ New client secret**.
-   - **Description**: `phase-1-dev`
+   - **Description**: `phase-2-dev`
    - **Expires**: 6 months (rotate via Key Vault later)
    - Click **Add**, then **immediately copy the Value** (not the Secret ID) → `.env` → `A365_APP_PASSWORD`.
 6. **API permissions** → **+ Add a permission** → **Microsoft Graph** → **Application permissions**:

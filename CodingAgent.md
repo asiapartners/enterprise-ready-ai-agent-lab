@@ -9,11 +9,11 @@ When a user opens this repository, use this guide to help them deploy the lab en
 
 A three-phase hands-on lab for building production-ready enterprise AI agents on Microsoft 365:
 
-| Phase | What gets built | Est. effort |
-|-------|----------------|-------------|
-| **Phase 1** | Self-hosted OpenClaw agent connected to Microsoft Teams, custom personality, persistent memory | 10–17 h |
-| **Phase 2** | Same agent with its own Entra ID identity (`agent@tenant`), Microsoft 365 Graph tools (calendar, email, user), iptables capability perimeters | ~23 h |
-| **Phase 3** | Multi-agent orchestration: Orchestrator + 3 specialists, Dataverse shared memory, Work IQ MCP, OpenTelemetry, Purview compliance | ~39 h |
+| Phase | What gets built | Est. effort | Status |
+|-------|----------------|-------------|--------|
+| **Phase 1** | Self-hosted OpenClaw agent connected to Microsoft Teams, custom personality, persistent memory | 10–17 hours | ✅ Active |
+| **Phase 2** | Same agent with its own Entra ID identity (`agent@tenant`), Microsoft 365 Graph tools (calendar, email, user), iptables capability perimeters | ~23 hours | ✅ Active |
+| **Phase 3** | Multi-agent orchestration: Orchestrator + 3 specialists, Dataverse shared memory, Work IQ MCP, OpenTelemetry, Purview compliance | ~39 hours | 🔜 Planned |
 
 Tech stack: **OpenClaw** (Node.js/TypeScript) · **openclaw-a365** (Docker) · **Azure OpenAI** · **Microsoft Graph API** · **Azure Bicep** · **Entra ID / FIC**
 
@@ -21,9 +21,11 @@ Tech stack: **OpenClaw** (Node.js/TypeScript) · **openclaw-a365** (Docker) · *
 
 ## Common Commands
 
+> **All scripts are designed to run from the repo root.** `cd` to the repo root before running any `./scripts/*.sh` command.
+
 ```bash
 # --- Prerequisites ---
-./scripts/preflight.sh                  # check all tools are installed
+./scripts/preflight.sh --phase 1        # check Phase 1 tools (use --phase 2 / 3 for later phases)
 
 # --- Phase 1 ---
 ./scripts/phase1-setup.sh               # interactive wizard: LLM config + workspace files
@@ -31,17 +33,27 @@ openclaw doctor --fix                   # validate OpenClaw config
 openclaw gateway                        # start the gateway (foreground)
 
 # --- Phase 2: Entra + Azure setup ---
-./scripts/az-entra-setup.sh             # Azure CLI automation for Entra credentials
+./scripts/preflight.sh --phase 2        # verify Azure CLI, jq, SSH key, .env state
+
+# Run the Entra automation; --env-file lets it write directly into the plugin folder
+./scripts/az-entra-setup.sh \
+  --env-file phase-2-tool-integration-capability-perimeters/a365-plugin/.env.generated
+
 cd phase-2-tool-integration-capability-perimeters/a365-plugin
-cp .env.example .env                    # then fill in values from az-entra-setup.sh output
+cp .env.example .env                    # initialise from template
+cat .env.generated >> .env              # merge generated values
+# Now edit .env: fill remaining manual values (AZURE_OPENAI_*, etc.) and remove duplicate keys
+
 docker compose up -d                    # start the agent locally
 docker compose logs -f                  # tail logs
 ./infra/deploy.sh dev                   # deploy to Azure VM (~10 min)
 
 # --- Verify deployment ---
-./scripts/verify.sh                     # run post-deployment health checks
+cd -                                    # back to repo root
+./scripts/verify.sh --phase 2           # run post-deployment health checks
 
 # --- Phase 2 plugin dev ---
+cd phase-2-tool-integration-capability-perimeters/a365-plugin
 pnpm install
 pnpm typecheck
 pnpm test
@@ -53,7 +65,7 @@ pnpm test
 
 ### What Claude should do
 
-1. **Check prerequisites** — run `./scripts/preflight.sh`. Fix anything flagged.
+1. **Check prerequisites** — from the **repo root**, run `./scripts/preflight.sh --phase 1`. Fix anything flagged.
 2. **Run the Phase 1 wizard** — run `./scripts/phase1-setup.sh`. This creates:
    - `~/.openclaw/config.json` (LLM provider + model)
    - `phase-1-building-autonomous-ai-assistant/workspace/AGENTS.md`
@@ -110,19 +122,21 @@ curl http://localhost:18789/v1/models     # → lists configured model
    az login
    az account set --subscription "<name-or-id>"
    ```
-3. **Run the Entra setup script** (automates app registration, permissions, user, FIC):
+3. **Run the Entra setup script** from the **repo root** (automates app registration, permissions, user, FIC). Tell the script to write its output directly into the plugin folder:
    ```bash
-   cd phase-2-tool-integration-capability-perimeters/a365-plugin
-   ../../scripts/az-entra-setup.sh
-   # Script outputs all .env values and writes them to .env.generated
+   ./scripts/az-entra-setup.sh \
+     --env-file phase-2-tool-integration-capability-perimeters/a365-plugin/.env.generated
    ```
    > The script pauses at Step 4 (AA Instance ID) because that step requires the M365 Agents portal.
    > Show the user the exact URL and fields to fill in, then resume.
 
-4. **Fill in `.env`**:
+4. **Merge generated values into `.env`**:
    ```bash
-   cp .env.example .env
-   # Open .env and paste values from az-entra-setup.sh output
+   cd phase-2-tool-integration-capability-perimeters/a365-plugin
+   cp .env.example .env                # initialise from template
+   cat .env.generated >> .env          # append generated values
+   # Open .env: fill in AZURE_OPENAI_API_KEY / AZURE_OPENAI_ENDPOINT,
+   # then dedupe any keys that now appear twice (the appended values win — keep them).
    # Required: A365_APP_ID, A365_APP_PASSWORD, A365_TENANT_ID, AA_INSTANCE_ID,
    #           AGENT_IDENTITY, OWNER, OWNER_AAD_ID, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
    ```
@@ -198,6 +212,25 @@ az monitor activity-log list \
 
 ---
 
+## Integrating the Agent 365 SDK into OpenClaw
+
+**When the user asks** any of: *"add Agent 365 SDK"*, *"add Work IQ MCP"*, *"add notification handlers"*, *"register MCP servers"*, *"add `mcp_MailTools`"*, *"use `a365` CLI"*, *"`a365 setup all`"*, *"`a365 develop add-mcp-servers`"* — read [`phase-2-.../setup/AGENT_365_SDK_INTEGRATION.md`](phase-2-tool-integration-capability-perimeters/setup/AGENT_365_SDK_INTEGRATION.md) and follow its 7 steps.
+
+### Quick decision tree
+
+| User intent | What to do |
+|-------------|-----------|
+| "Just install the SDK packages" | Step 1 of the guide: `pnpm add @microsoft/agents-a365-{notifications,tooling,tooling-extensions-claude}` |
+| "Wire up notification handlers" | Step 4: edit `src/monitor.ts` + `src/channel.ts` per the diff in the guide |
+| "Add MCP servers" (Mail, Calendar, Teams, etc.) | Step 5: `a365 develop add-mcp-servers <name>`, then create `src/mcp-tools.ts` and call `attachMcpTools()` from `src/channel.ts` |
+| "Replace `graph-tools.ts` with MCP" | Read Step 6 first — the recommended approach is **additive**, not replacement, unless you specifically need Purview audit trails or multi-user OBO |
+| "Run `a365 setup all` from scratch" | Step 3 Path B — but warn the user this creates a NEW blueprint and replaces existing `A365_APP_ID` / `A365_APP_PASSWORD` |
+| "Publish to M365 admin center" | After Steps 1–5 are done: `a365 publish` |
+
+**Critical rule**: never tell the user to delete `src/token.ts` or `src/graph-tools.ts`. The Agent 365 SDK integration is **additive**. The hand-rolled FIC flow continues to mint Graph tokens — the new MCP tools reuse those tokens via `getGraphToken({audience: 'api://agent365tools'})`.
+
+---
+
 ## Deploying Phase 3
 
 > Phase 3 is currently in planning. Code generation begins after Phase 2 is verified end-to-end.
@@ -258,25 +291,27 @@ az costmanagement query --type Usage --timeframe MonthToDate \
 
 ## Environment File Quick Setup
 
+> Run from the **repo root**.
+
 ```bash
-# Phase 2 — generate .env from template and inject known values
-cd phase-2-tool-integration-capability-perimeters/a365-plugin
-cp .env.example .env
+# Phase 2 — pre-fill the values you can derive from the current az login
+ENV_PATH="phase-2-tool-integration-capability-perimeters/a365-plugin/.env"
+cp phase-2-tool-integration-capability-perimeters/a365-plugin/.env.example "$ENV_PATH"
 
 # Auto-fill tenant ID
 TENANT_ID=$(az account show --query tenantId -o tsv)
-sed -i.bak "s/^A365_TENANT_ID=$/A365_TENANT_ID=${TENANT_ID}/" .env
+sed -i.bak "s/^A365_TENANT_ID=$/A365_TENANT_ID=${TENANT_ID}/" "$ENV_PATH"
 
 # Auto-fill OWNER and OWNER_AAD_ID from current az login
 OWNER_UPN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
 OWNER_OID=$(az ad signed-in-user show --query id -o tsv)
-sed -i.bak "s|^OWNER=owner@yourtenant.onmicrosoft.com|OWNER=${OWNER_UPN}|" .env
-sed -i.bak "s|^OWNER_AAD_ID=$|OWNER_AAD_ID=${OWNER_OID}|" .env
+sed -i.bak "s|^OWNER=owner@yourtenant.onmicrosoft.com|OWNER=${OWNER_UPN}|" "$ENV_PATH"
+sed -i.bak "s|^OWNER_AAD_ID=$|OWNER_AAD_ID=${OWNER_OID}|" "$ENV_PATH"
 
-rm -f .env.bak
+rm -f "${ENV_PATH}.bak"
 echo "✅ .env pre-filled with tenant, OWNER, OWNER_AAD_ID"
 echo "📋 Still needed: A365_APP_ID, A365_APP_PASSWORD, AA_INSTANCE_ID, AGENT_IDENTITY, AZURE_OPENAI_*"
-echo "   Run: ../../scripts/az-entra-setup.sh"
+echo "   Run: ./scripts/az-entra-setup.sh --env-file ${ENV_PATH}.generated"
 ```
 
 ---
@@ -375,5 +410,6 @@ ssh azureuser@<fqdn> 'sudo docker ps -a && sudo docker logs openclaw-a365 --tail
 | [`phase-2-.../README.md`](phase-2-tool-integration-capability-perimeters/README.md) | Phase 2 guide + Microsoft Agent 365 SDK reference |
 | [`phase-2-.../setup/AZURE_ENTRA_SETUP.md`](phase-2-tool-integration-capability-perimeters/setup/AZURE_ENTRA_SETUP.md) | Step-by-step: app reg, FIC, agent user, AA instance |
 | [`phase-2-.../setup/AZURE_VM_DEPLOY.md`](phase-2-tool-integration-capability-perimeters/setup/AZURE_VM_DEPLOY.md) | Azure VM deploy: Bicep, Caddy, Key Vault, ~$65/mo |
+| [`phase-2-.../setup/AGENT_365_SDK_INTEGRATION.md`](phase-2-tool-integration-capability-perimeters/setup/AGENT_365_SDK_INTEGRATION.md) | **Wire Agent 365 SDK into OpenClaw — packages, notification handlers, MCP tools, blueprint paths** |
 | [`phase-2-.../a365-plugin/AGENT_GUIDE.md`](phase-2-tool-integration-capability-perimeters/a365-plugin/AGENT_GUIDE.md) | Plugin architecture, source files, token flow |
 | [`phase-3-.../README.md`](phase-3-multi-agent-orchestration-governance/README.md) | Phase 3 spec: multi-agent, Dataverse, Work IQ |
