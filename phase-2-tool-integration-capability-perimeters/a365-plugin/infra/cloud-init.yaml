@@ -1,0 +1,214 @@
+#cloud-config
+# =============================================================================
+# openclaw-a365-agent-lab — VM bootstrap
+#
+# Placeholders substituted by Bicep at deploy time:
+#   __KV_NAME__     — Azure Key Vault name
+#   __DNS_LABEL__   — VM FQDN (used by Caddy for Let's Encrypt)
+#
+# What this does on first boot:
+#   1. Install Docker, Docker Compose plugin, Caddy, jq, ca-certificates.
+#   2. Pull A365 container image.
+#   3. Fetch secrets from Key Vault (via VM Managed Identity) → /etc/openclaw/.env
+#   4. Write Caddyfile + systemd unit for openclaw-a365.
+#   5. Enable + start everything.
+# =============================================================================
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+  - jq
+  - gnupg
+  - lsb-release
+  - debian-keyring
+  - debian-archive-keyring
+  - apt-transport-https
+
+write_files:
+  - path: /etc/caddy/Caddyfile
+    permissions: '0644'
+    owner: root:root
+    content: |
+      __DNS_LABEL__ {
+          encode zstd gzip
+          reverse_proxy 127.0.0.1:3978 {
+              header_up Host {host}
+              header_up X-Real-IP {remote}
+          }
+          log {
+              output file /var/log/caddy/access.log
+              format json
+          }
+      }
+
+  - path: /opt/openclaw/docker-compose.yml
+    permissions: '0644'
+    owner: root:root
+    content: |
+      services:
+        openclaw-a365:
+          image: ghcr.io/sidu/openclaw-a365:latest
+          container_name: openclaw-a365
+          restart: unless-stopped
+          cap_add:
+            - NET_ADMIN
+          env_file:
+            - /etc/openclaw/.env
+          ports:
+            - "127.0.0.1:3978:3978"
+          logging:
+            driver: json-file
+            options:
+              max-size: "10m"
+              max-file: "5"
+
+  - path: /usr/local/bin/openclaw-fetch-secrets.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      KV_NAME="__KV_NAME__"
+      ENV_FILE="/etc/openclaw/.env"
+
+      echo "[openclaw-fetch-secrets] Acquiring MI token..."
+      TOKEN=$(curl -s --max-time 15 -H Metadata:true \
+        "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net" \
+        | jq -r .access_token)
+
+      if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+        echo "[openclaw-fetch-secrets] Failed to acquire MI token" >&2
+        exit 1
+      fi
+
+      mkdir -p /etc/openclaw
+      # Start fresh; the .env is rebuilt each boot from KV (secrets) + VM-baked vars.
+      : > "$ENV_FILE"
+
+      # Non-secret env vars baked in at deploy time. Edit /etc/openclaw/env.public
+      # on the VM to override (cloud-init writes a default below).
+      if [ -f /etc/openclaw/env.public ]; then
+        cat /etc/openclaw/env.public >> "$ENV_FILE"
+      fi
+
+      # Secrets fetched from Key Vault
+      for name in A365_APP_PASSWORD AZURE_OPENAI_API_KEY; do
+        echo "[openclaw-fetch-secrets] Fetching $name..."
+        value=$(curl -s --max-time 15 -H "Authorization: Bearer $TOKEN" \
+          "https://${KV_NAME}.vault.azure.net/secrets/${name}?api-version=7.4" \
+          | jq -r .value)
+        if [ -z "$value" ] || [ "$value" = "null" ]; then
+          echo "[openclaw-fetch-secrets] WARN: $name not found in KV (yet)" >&2
+        else
+          echo "${name}=${value}" >> "$ENV_FILE"
+        fi
+      done
+
+      chmod 600 "$ENV_FILE"
+      echo "[openclaw-fetch-secrets] Done."
+
+  - path: /etc/openclaw/env.public
+    permissions: '0644'
+    owner: root:root
+    content: |
+      # Non-secret env vars. Edit and `systemctl restart openclaw-a365` to apply.
+      OPENCLAW_MODEL=azure/gpt-4o
+      OPENCLAW_LOG_LEVEL=info
+      NETWORK_MODE=restricted
+      DM_POLICY=pairing
+      BUSINESS_HOURS_START=08:00
+      BUSINESS_HOURS_END=18:00
+      TIMEZONE=Europe/Stockholm
+      # The following are set by `az keyvault secret set` calls in deploy.sh
+      # *or* manually edited here:
+      # A365_APP_ID=
+      # A365_TENANT_ID=
+      # AA_INSTANCE_ID=
+      # AGENT_IDENTITY=
+      # OWNER=
+      # OWNER_AAD_ID=
+      # AZURE_OPENAI_ENDPOINT=
+
+  - path: /etc/systemd/system/openclaw-fetch-secrets.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Fetch OpenClaw secrets from Azure Key Vault
+      Wants=network-online.target
+      After=network-online.target
+      Before=openclaw-a365.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/openclaw-fetch-secrets.sh
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/openclaw-a365.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=OpenClaw A365 Agent
+      Requires=docker.service openclaw-fetch-secrets.service
+      After=docker.service openclaw-fetch-secrets.service
+
+      [Service]
+      Type=simple
+      WorkingDirectory=/opt/openclaw
+      ExecStartPre=/usr/bin/docker compose pull
+      ExecStart=/usr/bin/docker compose up
+      ExecStop=/usr/bin/docker compose down
+      Restart=on-failure
+      RestartSec=10s
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # ---- Docker ----
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+      | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - systemctl enable --now docker
+
+  # ---- Caddy ----
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update
+  - apt-get install -y caddy
+  - systemctl enable --now caddy
+
+  # ---- OpenClaw ----
+  - systemctl daemon-reload
+  - systemctl enable openclaw-fetch-secrets.service
+  - systemctl enable openclaw-a365.service
+  # Best-effort first-boot start (will retry if KV secrets aren't populated yet)
+  - systemctl start openclaw-fetch-secrets.service || true
+  - systemctl start openclaw-a365.service || true
+
+final_message: |
+  ============================================================================
+  openclaw-a365-agent-lab VM bootstrap complete.
+
+  Caddy is serving https://__DNS_LABEL__/  (Let's Encrypt cert auto-issued)
+  Container is running on 127.0.0.1:3978
+
+  Next steps from your laptop:
+    1. Populate Key Vault __KV_NAME__ with secrets (deploy.sh does this)
+    2. SSH in and verify: sudo systemctl status openclaw-a365
+    3. Update Azure Bot resource messaging endpoint to:
+         https://__DNS_LABEL__/api/messages
+    4. Test in Teams.
+  ============================================================================
