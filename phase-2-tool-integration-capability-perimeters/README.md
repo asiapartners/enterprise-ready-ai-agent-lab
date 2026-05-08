@@ -137,6 +137,549 @@ The three enforcement modes:
 | [`setup/NETWORK_POLICY.md`](./setup/NETWORK_POLICY.md) | Capability perimeters via iptables |
 | [`setup/APPROVAL_WORKFLOWS.md`](./setup/APPROVAL_WORKFLOWS.md) | Adaptive Card approval gates + human-in-the-loop |
 
+---
+
+## Microsoft Agent 365 SDK — Concepts & Integration
+
+The `openclaw-a365` plugin already implements the core mechanics of the Microsoft Agent 365 SDK by hand — FIC tokens, Bot Framework messaging, proactive send. This section maps the official Agent 365 SDK vocabulary to what we've built, adds the concepts not yet covered (tooling servers, notifications, blueprint CLI), and gives you the reference you need when expanding or migrating to the official SDK.
+
+> **Official reference**: [learn.microsoft.com/en-us/microsoft-agent-365/developer/](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/)
+
+---
+
+### Agent Identity
+
+Every enterprise agent in the Agent 365 model has **three identity components** that work together:
+
+| Component | What it is | In this lab |
+|-----------|-----------|-------------|
+| **Agent blueprint** (Agentic application) | IT-approved template: Entra app registration, Graph scopes, auth config, resource definitions | Your `A365_APP_ID` app registration in Entra |
+| **Agent instance** | A deployment of the blueprint: unique Entra Agent ID, service principal, FIC credentials | The running container — one instance per tenant |
+| **Agent user** | Runtime identity visible in your org: mailbox, Teams presence, org chart entry, `agent@tenant.onmicrosoft.com` | `AGENT_IDENTITY` env var |
+
+#### Agent user characteristics
+
+- Marked as **agentic** in the directory (`idtyp=user` in tokens)
+- **Cannot** have passwords, passkeys, or MFA factors
+- Must be created via API call from the parent agent instance
+- Can be @mentioned in Teams, Word, email, and other M365 apps
+- Appears in the org chart under an assigned manager
+- Mailbox and OneDrive provisioned after license assignment (10–15 min, up to 24 h)
+
+#### Authentication flows
+
+The Agent 365 SDK supports two flows, both already implemented in `src/token.ts`:
+
+| Flow | Description | When to use |
+|------|-------------|-------------|
+| **Agent identity** (FIC/T1→T2→Agent) | Agent authenticates with its own credentials; acts as itself | Autonomous tasks: calendar, email from agent's mailbox, background processing |
+| **On-Behalf-Of (OBO)** | Agent receives user's delegated token; acts as the user | Accessing user-specific data with user's permissions; auditable reactive flows |
+
+#### Permission management
+
+Permissions can be set at three levels:
+- **Blueprint level** — base permissions inherited by all instances
+- **Instance level** — specific permissions for this deployment
+- **Agent user level** — user-specific grants and licenses
+
+Required licenses for full Microsoft 365 capabilities: **Microsoft 365 E5**, **Teams Enterprise**, or **Microsoft 365 Copilot**.
+
+---
+
+### Agent Blueprint
+
+The blueprint is the **IT-approved, governance-enforced definition** of your agent's capabilities. It defines:
+
+- Permitted Work IQ tool access
+- Security and compliance constraints (Purview DLP, Defender monitoring)
+- Audit requirements and lifecycle metadata
+- Linked governance policy templates (DLP, external access, logging)
+
+When a blueprint is **activated** in the M365 admin center, users can request new agent instances from it. Every instance inherits the blueprint's rules — preventing shadow/rogue agents and anchoring each agent in Entra governance.
+
+#### Create a blueprint with the Agent 365 CLI
+
+The `a365` CLI automates the full setup. Install it and run:
+
+```bash
+# Default agent setup (reads a365.config.json if present)
+a365 setup all
+
+# Config-free (no a365.config.json needed)
+a365 setup all --agent-name <your-agent-name>
+
+# M365 agent (Teams / Copilot) — registers messaging endpoint automatically
+a365 setup all --m365
+
+# AI Teammate (Frontier preview — own mailbox + Teams presence)
+a365 setup all --aiteammate
+```
+
+`a365 setup all` performs:
+1. Creates Azure infrastructure (resource group, App Service Plan, Web App with managed identity)
+2. Registers agent blueprint in Entra (app registration, service principal, FIC, `managerApplications`)
+3. Configures API permissions (Microsoft Graph, Messaging Bot API, inheritable instance permissions)
+4. Saves all generated IDs and the messaging endpoint to `a365.generated.config.json`
+
+> **Note:** Blueprints must have `managerApplications` set or the platform rejects them. The CLI sets this automatically.
+
+#### Configuration file (`a365.config.json`)
+
+```json
+{
+  "agentName": "OpenClaw-A365",
+  "tenantId": "${AZURE_TENANT_ID}",
+  "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+  "resourceGroupName": "rg-openclaw-lab-dev",
+  "appServicePlanSku": "B1",
+  "messagingEndpoint": "https://your-app.azurewebsites.net/api/messages",
+  "deploymentProjectPath": "."
+}
+```
+
+#### Apply custom Graph API permissions
+
+```bash
+a365 setup permissions custom \
+  --resource-app-id 00000003-0000-0000-c000-000000000000 \
+  --scopes Mail.Read,Mail.Send,Calendars.ReadWrite,User.Read.All
+```
+
+#### Verify setup
+
+```bash
+# Check generated config
+cat a365.generated.config.json | jq .
+
+# Verify Azure resources
+az resource list --resource-group rg-openclaw-lab-dev --output table
+
+# Verify managed identity is enabled
+az webapp identity show --name <your-web-app> --resource-group rg-openclaw-lab-dev
+```
+
+Expected key fields in `a365.generated.config.json`:
+
+| Field | Purpose |
+|-------|---------|
+| `agentBlueprintId` | Your agent's unique Entra ID — used in Developer Portal and admin center |
+| `messagingEndpoint` | Where Teams/Outlook route inbound messages |
+| `managedIdentityPrincipalId` | Azure managed identity for Key Vault access |
+| `resourceConsents` | API permissions granted (Graph, Messaging Bot, Observability, Power Platform) |
+| `completed` | Must be `true` before deployment |
+
+---
+
+### Agent Messaging Endpoint
+
+The **messaging endpoint** is the HTTPS URL where the Agent 365 service delivers agentic notification messages to your agent. In the lab this is already wired as `POST /api/messages` served by `src/monitor.ts` on port 3978 behind Caddy TLS.
+
+#### Configure in `a365.config.json`
+
+```json
+{
+  "messagingEndpoint": "https://your-app.azurewebsites.net/api/messages",
+  "deploymentProjectPath": "."
+}
+```
+
+#### Register the endpoint
+
+```bash
+# M365 agents (Teams / Copilot) — registers via Teams Graph / MCP Platform
+a365 setup blueprint --endpoint-only --m365
+
+# Non-M365 agents — prints the Teams Developer Portal URL for manual config
+a365 setup blueprint --endpoint-only
+
+# Update an existing endpoint URL
+a365 setup blueprint --update-endpoint https://your-new-host.example.com/api/messages --m365
+```
+
+#### Endpoint URL patterns by deployment
+
+| Target | URL pattern |
+|--------|------------|
+| Azure Web App | `https://<app>.azurewebsites.net/api/messages` |
+| Azure VM + Caddy (this lab) | `https://<fqdn>.cloudapp.azure.com/api/messages` |
+| AWS API Gateway | `https://<id>.execute-api.<region>.amazonaws.com/api/messages` |
+| GCP Cloud Run | `https://<hash>-<region>.run.app/api/messages` |
+| Local (Dev Tunnels) | `https://<id>.devtunnels.ms:3978/api/messages` |
+
+#### Remove the endpoint registration
+
+```bash
+# M365 agents
+a365 cleanup blueprint --endpoint-only --m365
+
+# Non-M365 agents
+a365 cleanup blueprint --endpoint-only
+```
+
+---
+
+### Tooling Servers (Work IQ MCP)
+
+**Work IQ MCP** is the governed gateway for Microsoft 365 tool access. It replaces direct Graph API calls with standardized, admin-controlled, auditable MCP servers. The lab's `src/graph-tools.ts` implements the same operations as Work IQ tools — the migration path is clear.
+
+#### Agent 365 tools catalog
+
+| MCP Server | Capabilities |
+|------------|-------------|
+| **Work IQ Copilot** | Chat with M365 Copilot, multi-turn threads, ground responses with files |
+| **Work IQ Calendar** | Create, list, update, delete events; accept/decline; resolve conflicts |
+| **Work IQ Mail** | Create, update, delete messages; reply; semantic search |
+| **Work IQ SharePoint** | Upload files; get metadata; search; manage lists |
+| **Work IQ OneDrive** | Manage files and folders in personal OneDrive |
+| **Work IQ Teams** | Create/update chats; add members; post messages; channel operations |
+| **Work IQ User** | Get manager, direct reports, profile info; search users |
+| **Work IQ Word** | Create/read documents; add/reply to comments |
+| **Dataverse / Dynamics 365** | CRUD operations and domain-specific business actions |
+
+> **Note:** Work IQ MCP servers require a **Microsoft 365 Copilot license**.
+
+#### Add MCP servers to your agent
+
+```bash
+# List all available MCP servers in the catalog
+a365 develop list-available
+
+# Add one or more servers (updates ToolingManifest.json only — no permissions granted yet)
+a365 develop add-mcp-servers mcp_MailTools
+a365 develop add-mcp-servers mcp_CalendarTools mcp_TeamsTools
+
+# List currently configured servers
+a365 develop list-configured
+
+# Remove a server
+a365 develop remove-mcp-servers mcp_MailTools
+
+# Grant blueprint permissions (Global Administrator required)
+# First-time: permissions are included in a365 setup all
+# After blueprint exists:
+a365 setup permissions mcp
+```
+
+#### `ToolingManifest.json` structure
+
+```json
+{
+  "mcpServers": [
+    {
+      "mcpServerName": "mcp_MailTools",
+      "mcpServerUniqueName": "mcp_MailTools",
+      "scope": "McpServers.Mail.All",
+      "audience": "api://05879165-0320-489e-b644-f72b33f3edf0"
+    },
+    {
+      "mcpServerName": "mcp_CalendarTools",
+      "mcpServerUniqueName": "mcp_CalendarTools",
+      "scope": "McpServers.Calendar.All",
+      "audience": "api://05879165-0320-489e-b644-f72b33f3edf0"
+    }
+  ]
+}
+```
+
+#### Integrate tools into your agent (Node.js / TypeScript)
+
+For the OpenClaw a365-plugin (Node.js + LangChain or Claude):
+
+```typescript
+// Claude integration (official package)
+import { McpToolRegistrationService } from '@microsoft/agents-a365-tooling-extensions-claude';
+
+// LangChain integration
+import { McpToolRegistrationService } from '@microsoft/agents-a365-tooling-extensions-langchain';
+
+const toolService = new McpToolRegistrationService();
+
+// Register all MCP tools with your agent — handles both agentic and OBO auth
+try {
+  const agent = await toolService.addToolServersToAgent(
+    agent,
+    process.env.AGENTIC_USER_ID || '',  // agent user object ID
+    authorization,                        // user authorization context
+    turnContext,                          // current turn context from Agents SDK
+    process.env.MCP_AUTH_TOKEN || '',     // optional OBO bearer token
+  );
+} catch (error) {
+  console.error('Error adding MCP tool servers:', error);
+}
+```
+
+The `addToolServersToAgent` method automatically:
+- Loads all MCP servers from `ToolingManifest.json`
+- Registers tools with the orchestrator
+- Sets up authentication from manifest configuration
+- Makes all tools immediately available for invocation
+
+#### Local development with mock tooling server
+
+```bash
+# Start mock server (no auth required — good for early testing)
+a365 develop start-mock-tooling-server
+
+# Point your agent at the mock server
+MCP_PLATFORM_ENDPOINT=http://localhost:5309
+```
+
+#### Use Work IQ MCP directly in Claude Code
+
+Add to `.mcp.json` in your project directory:
+
+```json
+{
+  "mcpServers": {
+    "WorkIQ-MailServer": {
+      "type": "http",
+      "url": "https://agent365.svc.cloud.microsoft/agents/tenants/<tenantId>/servers/mcp_MailTools",
+      "oauth": {
+        "clientId": "<your-enterprise-app-client-id>",
+        "callbackPort": 8080
+      }
+    }
+  }
+}
+```
+
+Then run `/mcp` in Claude Code and authenticate.
+
+---
+
+### Handle Messages
+
+The agent receives messages through the **Activity Protocol** — the same HTTP-based protocol used by the Bot Framework. In the lab, `src/channel.ts` implements the full receive→process→reply loop and `src/monitor.ts` hosts the Express server.
+
+#### Message routing in the lab
+
+```
+POST /api/messages
+        ↓
+src/monitor.ts  (CloudAdapter, AgentApplication)
+        ↓
+src/channel.ts  (A365Channel.receive)
+        ├── extract metadata (user UPN, conversation ID)
+        ├── store ConversationReference → conversation-store.ts
+        ├── run with graph tool context (AsyncLocalStorage)
+        └── route to OpenClaw agent runtime (LLM loop)
+                ↓
+        agent response → sendActivity(ctx, text)
+```
+
+#### Key implementation patterns
+
+```typescript
+// src/channel.ts — receive a message with full context isolation
+runWithGraphToolContext({
+  agentIdentity: process.env.AGENT_IDENTITY!,
+  currentUserEmail: activity.from.aadObjectId,
+  currentUserRole: getRole(activity.from.aadObjectId),
+  sendActivity: ctx.sendActivity.bind(ctx),
+}, async () => {
+  // All graph-tools calls safely isolated per request
+  await runtime.handleMessage(message, tools);
+});
+```
+
+#### Agent 365 SDK approach (official)
+
+The official SDK adds typed routing via `AgentApplication` with per-activity-type handlers:
+
+```typescript
+import { AgentApplication } from '@microsoft/agents-hosting';
+
+const app = new AgentApplication();
+
+// Handle standard conversational messages
+app.activity(ActivityTypes.Message, async (context, state) => {
+  const userText = context.activity.text;
+  await context.sendActivity(`You said: ${userText}`);
+});
+
+// Handle Teams-specific events
+app.activity('invoke', async (context, state) => {
+  // Adaptive Card Action.Submit callbacks land here
+});
+```
+
+---
+
+### Notify Agents
+
+The Agent 365 SDK lets your agent **receive push notifications** from Microsoft 365 — not just respond to user messages. Your agent is notified when someone emails it, @mentions it in a Word comment, or when its identity lifecycle changes.
+
+#### Supported notification types
+
+| Notification type | Trigger | Sub-channel |
+|------------------|---------|-------------|
+| **Email** | Agent receives an email (addressed or @mentioned) | `email` |
+| **Word** | Agent @mentioned in a Word document comment | `word` |
+| **Excel** | Agent @mentioned in an Excel comment | `excel` |
+| **PowerPoint** | Agent @mentioned in a PowerPoint comment | `powerpoint` |
+| **Lifecycle: UserIdentityCreated** | Agent user identity created | N/A |
+| **Lifecycle: WorkloadOnboardingUpdated** | Agent user workload onboarding status changed | N/A |
+| **Lifecycle: UserDeleted** | Agent user identity deleted | N/A |
+
+#### Add notification handling (Node.js / TypeScript)
+
+```typescript
+import { AgentApplication, TurnContext, TurnState } from '@microsoft/agents-hosting';
+import { ActivityTypes } from '@microsoft/agents-activity';
+import {
+  AgentNotificationActivity,
+  NotificationType
+} from '@microsoft/agents-a365-notifications';
+
+const app = new AgentApplication<TurnState>();
+
+// Handle all notification types
+app.onAgentNotification(async (context: TurnContext, state: TurnState, notification: AgentNotificationActivity) => {
+  switch (notification.notificationType) {
+    case NotificationType.EmailNotification:
+      const email = notification.emailNotification;
+      console.log('Email received:', email?.id, 'from conversation:', email?.conversationId);
+      await context.sendActivity('Got your email — I will follow up shortly.');
+      break;
+
+    case NotificationType.WpxComment:
+      const comment = notification.wpxCommentNotification;
+      console.log('Document comment received in:', comment?.documentUrl);
+      await context.sendActivity('I see your comment — reviewing now.');
+      break;
+
+    case NotificationType.AgentLifecycleNotification:
+      console.log('Lifecycle event:', notification.lifecycleEvent);
+      // Initialize resources, clean up state, etc.
+      break;
+  }
+});
+
+// Specialized handler — email only (with auto-authentication)
+app.onAgenticEmailNotification(
+  async (context, state, notification) => {
+    const email = notification.emailNotification;
+    await context.sendActivity(`Received email: ${email?.subject}`);
+  },
+  32767,          // rank (lower = higher priority)
+  ['agentic']     // autoSignInHandlers
+);
+```
+
+#### Install notification packages
+
+```bash
+# Node.js / TypeScript
+npm install @microsoft/agents-a365-notifications
+
+# Python
+pip install microsoft-agents-a365-notifications
+
+# .NET
+dotnet add package Microsoft.Agents.A365.Notifications
+```
+
+#### Identify the sender
+
+Every notification activity includes `Activity.From` — pre-populated by the Agent 365 platform, no extra API calls needed:
+
+```typescript
+app.onAgentNotification(async (context, state, notification) => {
+  const sender = context.activity.from;
+  console.log(`Notification from: ${sender.name} (${sender.aadObjectId})`);
+});
+```
+
+---
+
+### Deploy Your Agent
+
+Phase 2 already includes a full Azure VM deployment via `a365-plugin/infra/` (Bicep + cloud-init + Caddy). The Agent 365 CLI provides an alternative path to Azure App Service with deeper SDK integration.
+
+#### Option A — VM deployment (this lab, ~$65/mo)
+
+See [`setup/AZURE_VM_DEPLOY.md`](./setup/AZURE_VM_DEPLOY.md) for the full walkthrough.
+
+```bash
+# One-command deploy to Azure VM
+./a365-plugin/infra/deploy.sh dev
+
+# Tail cloud-init log until container is up
+ssh azureuser@<fqdn> 'sudo tail -f /var/log/cloud-init-output.log'
+```
+
+#### Option B — Azure App Service via Agent 365 CLI
+
+```bash
+# 1. Build your project
+npm run build
+
+# 2. Deploy to Azure Web App (created by a365 setup all)
+az webapp deploy \
+  --name <your-web-app> \
+  --resource-group <your-resource-group> \
+  --src-path ./dist
+
+# 3. Verify deployment
+az webapp show --name <your-web-app> --resource-group <your-resource-group> --query state
+# Expected: "Running"
+
+# 4. Tail logs
+az webapp log tail --name <your-web-app> --resource-group <your-resource-group>
+```
+
+#### Environment variable management for App Service
+
+```bash
+# List current app settings
+az webapp config appsettings list \
+  --name <your-web-app> --resource-group <your-resource-group>
+
+# Set individual variables
+az webapp config appsettings set \
+  --name <your-web-app> --resource-group <your-resource-group> \
+  --settings A365_APP_ID=<id> AGENT_IDENTITY=agent@yourtenant.onmicrosoft.com
+
+# Use Key Vault references for secrets (recommended)
+az webapp config appsettings set \
+  --name <your-web-app> --resource-group <your-resource-group> \
+  --settings A365_APP_PASSWORD="@Microsoft.KeyVault(SecretUri=https://...)"
+```
+
+#### Verify messaging endpoint responds
+
+```bash
+# Should return 401, not 404
+curl https://<your-app>.azurewebsites.net/api/messages -X POST
+
+# Or for VM deployment
+curl https://<fqdn>/api/messages -X POST
+```
+
+#### Publish to Microsoft 365 admin center
+
+Once deployed, make your agent discoverable by IT admins:
+
+```bash
+# Publish agent package to M365 admin center
+a365 publish
+```
+
+This creates a `manifest.zip` and uploads it, making the agent visible in the Microsoft 365 admin center under **Agents and Tools**. Admins can then activate the blueprint, grant permissions, and create agent instances for their users.
+
+#### Post-deployment checklist
+
+- [ ] Container/Web App is running (`Running` state)
+- [ ] `POST /api/messages` returns `401` (not `404`)
+- [ ] Bot responds in Teams: `Hello`
+- [ ] `get_calendar_events` returns real data
+- [ ] `send_email` delivers a test email from `AGENT_IDENTITY`
+- [ ] `NETWORK_MODE=restricted` still allows Teams + Graph API
+- [ ] Azure AD audit logs show agent calls under `agent@yourtenant.onmicrosoft.com`
+- [ ] Application Insights / Log Analytics shows agent traces
+
+---
+
 ## Resuming Phase 2
 
 When Phase 1 is verified and you're ready, ask:

@@ -53,7 +53,7 @@ phase-2-tool-integration-capability-perimeters/
 |------|-------------|
 | Understand the architecture | [README.md — Modules](./README.md#modules) |
 | Create Azure credentials | [setup/AZURE_ENTRA_SETUP.md](./setup/AZURE_ENTRA_SETUP.md) |
-| Deploy the container | [README.md — Modules](./README.md#modules) |
+| Deploy the container | [README.md — Deploy Your Agent](./README.md#deploy-your-agent) |
 | Connect to Microsoft Teams | [setup/M365_AGENTS_SETUP.md](./setup/M365_AGENTS_SETUP.md) |
 | Understand calendar/email tools | [setup/GRAPH_API_TOOLS.md](./setup/GRAPH_API_TOOLS.md) |
 | Enable network restrictions | [setup/NETWORK_POLICY.md](./setup/NETWORK_POLICY.md) |
@@ -62,6 +62,12 @@ phase-2-tool-integration-capability-perimeters/
 | Read the plugin developer docs | [a365-plugin/AGENT_GUIDE.md](./a365-plugin/AGENT_GUIDE.md) |
 | Fix a deployment issue | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) |
 | Understand the token flow | [README.md — Modules](./README.md#modules) |
+| Understand Agent 365 agent identity | [README.md — Agent Identity](./README.md#agent-identity) |
+| Set up an agent blueprint (CLI) | [README.md — Agent Blueprint](./README.md#agent-blueprint) |
+| Configure the messaging endpoint | [README.md — Agent Messaging Endpoint](./README.md#agent-messaging-endpoint) |
+| Add Work IQ / MCP tooling servers | [README.md — Tooling Servers](./README.md#tooling-servers-work-iq-mcp) |
+| Handle messages in your agent | [README.md — Handle Messages](./README.md#handle-messages) |
+| Receive notifications (email, docs) | [README.md — Notify Agents](./README.md#notify-agents) |
 
 ---
 
