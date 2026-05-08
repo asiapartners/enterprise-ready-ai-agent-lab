@@ -60,7 +60,7 @@ Open this repo in Claude Code, GitHub Copilot, or any AI coding agent and say:
 Set up the Enterprise AI Agent Lab Phase 1
 ```
 
-The AI reads [`CodingAgent.md`](./CodingAgent.md) (and [`.github/copilot-instructions.md`](./.github/copilot-instructions.md) for GitHub Copilot) and walks you through every step — prerequisites, configuration, deployment, and verification.
+The AI reads [`CodingAgent.md`](./CodingAgent.md) and walks you through every step — prerequisites, configuration, deployment, and verification.
 
 ### Manual start — Phase 1
 
