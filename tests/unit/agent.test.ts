@@ -1,0 +1,82 @@
+/**
+ * Unit tests for agent.ts — role detection and DM policy
+ */
+
+import { Agent365Handler } from "../../src/agent";
+
+// Stub OpenClaw runtime to avoid real init
+jest.mock("../../src/openclaw-connector", () => ({
+  openClawRuntime: {
+    init: jest.fn().mockResolvedValue(undefined),
+    processMessage: jest.fn().mockResolvedValue({ text: "stub response" }),
+  },
+}));
+
+jest.mock("../../src/config", () => ({
+  config: {
+    a365AppId: "test-app-id",
+    a365AppPassword: "test-password",
+    a365TenantId: "test-tenant-id",
+    microsoftAppType: "SingleTenant",
+    agentIdentity: "agent@test.example.com",
+    ownerAadId: "owner-aad-id",
+    dmPolicy: "pairing",
+    otelServiceName: "test",
+    otelServiceVersion: "0.0.1",
+    appEnv: "development",
+    port: 3978,
+  },
+}));
+
+function makeTurnContext(overrides: Record<string, unknown> = {}) {
+  const defaults = {
+    activity: {
+      type: "message",
+      text: "Hello",
+      from: { id: "user-1", aadObjectId: "non-owner-aad-id", name: "user@test.com" },
+      recipient: { id: "bot-1" },
+      conversation: { id: "conv-1", conversationType: "personal" },
+      channelId: "msteams",
+      membersAdded: [],
+    },
+    sendActivity: jest.fn().mockResolvedValue(undefined),
+  };
+
+  return { ...defaults, ...overrides };
+}
+
+describe("Agent365Handler", () => {
+  it("instantiates without errors", () => {
+    expect(() => new Agent365Handler()).not.toThrow();
+  });
+
+  it("detects Owner role when AAD ID matches OWNER_AAD_ID", () => {
+    const handler = new Agent365Handler() as unknown as {
+      buildAgentContext: (ctx: unknown) => { userRole: string };
+    };
+    const ctx = makeTurnContext({
+      activity: {
+        type: "message",
+        text: "test",
+        from: { id: "owner-1", aadObjectId: "owner-aad-id", name: "owner@test.com" },
+        recipient: { id: "bot-1" },
+        conversation: { id: "conv-1", conversationType: "personal" },
+        channelId: "msteams",
+      },
+    });
+    // Access private method for unit testing
+    const context = (handler as unknown as {
+      buildAgentContext: (ctx: unknown) => { userRole: string };
+    }).buildAgentContext(ctx);
+    expect(context.userRole).toBe("Owner");
+  });
+
+  it("detects Requester role for non-owners", () => {
+    const handler = new Agent365Handler();
+    const ctx = makeTurnContext();
+    const context = (handler as unknown as {
+      buildAgentContext: (ctx: unknown) => { userRole: string };
+    }).buildAgentContext(ctx);
+    expect(context.userRole).toBe("Requester");
+  });
+});

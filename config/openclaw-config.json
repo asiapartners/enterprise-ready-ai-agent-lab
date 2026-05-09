@@ -1,0 +1,43 @@
+{
+  "gateway": {
+    "port": 18789,
+    "host": "0.0.0.0",
+    "logLevel": "info"
+  },
+  "agents": {
+    "routes": [
+      {
+        "channel": "teams",
+        "agent": "production-agent",
+        "description": "Primary agent for Microsoft Teams and M365 Copilot"
+      },
+      {
+        "channel": "webchat",
+        "agent": "support-agent",
+        "description": "Web chat support agent (optional, for webchat channel)"
+      }
+    ],
+    "default": "production-agent"
+  },
+  "sandbox": {
+    "mode": "non-main",
+    "description": "Run agent logic in a non-main thread for isolation and safety"
+  },
+  "plugins": [
+    {
+      "name": "a365-channel",
+      "path": "./openclaw.plugin.json",
+      "enabled": true
+    }
+  ],
+  "network": {
+    "allowedDomains": [
+      "login.microsoftonline.com",
+      "graph.microsoft.com",
+      "api.botframework.com",
+      "smba.trafficmanager.net",
+      "api.anthropic.com",
+      "api.openai.com"
+    ]
+  }
+}

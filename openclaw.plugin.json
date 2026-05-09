@@ -1,0 +1,49 @@
+{
+  "name": "a365-channel",
+  "version": "0.1.0",
+  "description": "Microsoft 365 Agents channel for OpenClaw with Graph API tools and agentic identity",
+  "type": "channel",
+  "entryPoint": "dist/index.js",
+  "config": {
+    "port": 3978,
+    "endpoint": "/api/messages",
+    "healthEndpoint": "/health"
+  },
+  "capabilities": [
+    "messaging",
+    "graph-api",
+    "agentic-identity",
+    "network-policy"
+  ],
+  "tools": [
+    "get_calendar_events",
+    "create_calendar_event",
+    "update_calendar_event",
+    "delete_calendar_event",
+    "find_meeting_times",
+    "send_email",
+    "get_user_info"
+  ],
+  "requiredEnv": [
+    "A365_APP_ID",
+    "A365_APP_PASSWORD",
+    "A365_TENANT_ID",
+    "AA_INSTANCE_ID",
+    "AGENT_IDENTITY",
+    "OWNER",
+    "OWNER_AAD_ID"
+  ],
+  "optionalEnv": [
+    "OPENCLAW_MODEL",
+    "OPENCLAW_FALLBACK_MODELS",
+    "NETWORK_MODE",
+    "NETWORK_ALLOWLIST",
+    "BUSINESS_HOURS_START",
+    "BUSINESS_HOURS_END",
+    "TIMEZONE",
+    "DM_POLICY",
+    "APPINSIGHTS_CONNECTION_STRING"
+  ],
+  "repository": "https://github.com/SidU/openclaw-a365",
+  "license": "MIT"
+}

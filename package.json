@@ -1,0 +1,56 @@
+{
+  "name": "openclaw-agent365",
+  "version": "0.1.0",
+  "description": "Production agent integrating OpenClaw runtime with Microsoft Agent 365 SDK for Teams and M365 Copilot",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts' --max-warnings 0",
+    "test": "jest --testPathPattern='tests/(unit|integration)' --coverage --forceExit",
+    "test:e2e": "jest --testPathPattern='tests/e2e' --forceExit --testTimeout=60000",
+    "test:load": "k6 run tests/load/load-test.js",
+    "test:all": "jest --coverage --forceExit",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist coverage",
+    "setup": "bash scripts/setup.sh"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "@microsoft/agents-activity": "^1.0.0",
+    "@microsoft/agents-bot-adapter": "^1.0.0",
+    "@microsoft/agents-hosting": "^1.0.0",
+    "@azure/identity": "^4.0.0",
+    "@azure/keyvault-secrets": "^4.8.0",
+    "@azure/monitor-opentelemetry-exporter": "^1.0.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-node": "^0.52.0",
+    "@opentelemetry/instrumentation-http": "^0.52.0",
+    "@opentelemetry/instrumentation-express": "^0.42.0",
+    "@opentelemetry/resources": "^1.25.0",
+    "@opentelemetry/semantic-conventions": "^1.25.0",
+    "applicationinsights": "^3.0.0",
+    "express": "^4.19.0",
+    "dotenv": "^16.4.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=9"
+  },
+  "license": "MIT"
+}
