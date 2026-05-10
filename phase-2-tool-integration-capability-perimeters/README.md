@@ -146,6 +146,8 @@ The `openclaw-a365` plugin already implements the core mechanics of the Microsof
 
 > **For the actual code-level integration steps** — installing the SDK packages, wiring notification handlers into `src/monitor.ts`, registering Work IQ MCP tools alongside the existing direct-Graph tools, and choosing between manual Entra setup vs. `a365 setup all` — see **[`setup/AGENT_365_SDK_INTEGRATION.md`](./setup/AGENT_365_SDK_INTEGRATION.md)**.
 
+> **For the broader two-pattern context** — the `openclaw-a365` plugin in this phase is one packaged realisation of **Pattern A** (OpenClaw Gateway routes channels to an SDK agent). If you want **Pattern B** (SDK agent runs standalone with Azure Bot Service and calls OpenClaw skills via the Gateway API), or the AI-guided `aka.ms/agent365enable` onboarding flow, see the top-level **[`TEAMS_COPILOT_INTEGRATION.md`](../TEAMS_COPILOT_INTEGRATION.md)**.
+
 > **Official reference**: [learn.microsoft.com/en-us/microsoft-agent-365/developer/](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/)
 
 > **AI-guided setup**: Open this repo in Claude Code or GitHub Copilot CLI and say _"Set up the Enterprise AI Agent Lab Phase 2"_. The AI reads [`CodingAgent.md`](../../CodingAgent.md) and walks you through every step automatically — the same pattern used by the official Agent 365 [`aka.ms/agent365enable`](https://aka.ms/agent365enable) instruction file.

@@ -358,9 +358,11 @@ phase-1-building-autonomous-ai-assistant/
 
 ## Next: Phase 2 & 3
 
-After completing Phase 1:
+After completing Phase 1, you have two paths to take your agent into Microsoft Teams and M365 Copilot:
 
-- **[Phase 2: Tool Integration & Capability Perimeters](../phase-2-tool-integration-capability-perimeters/README.md)**
+- **[`TEAMS_COPILOT_INTEGRATION.md`](../TEAMS_COPILOT_INTEGRATION.md)** — composable approach: keep OpenClaw as your multi-channel gateway, add a Microsoft 365 Agents SDK agent at port 3978, and onboard with the Agent 365 SDK via `aka.ms/agent365enable` or the `a365` CLI. Works for personal multi-channel use (Pattern A) and enterprise Teams/Copilot deployments (Pattern B).
+
+- **[Phase 2: Tool Integration & Capability Perimeters](../phase-2-tool-integration-capability-perimeters/README.md)** — packaged approach: deploy the `openclaw-a365` plugin as a single Docker container with agentic identity, FIC tokens, Microsoft Graph calendar/email tools, and iptables-enforced network perimeter.
   - Connect to Microsoft 365 APIs and external services
   - Define safety boundaries and network policies
   - Implement approval workflows

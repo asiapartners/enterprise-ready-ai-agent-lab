@@ -62,6 +62,14 @@ Set up the Enterprise AI Agent Lab Phase 1
 
 The AI reads [`CodingAgent.md`](./CodingAgent.md) and walks you through every step — prerequisites, configuration, deployment, and verification.
 
+### Two paths to Microsoft Teams + Copilot
+
+| If you want… | Follow… |
+|--------------|---------|
+| The packaged plugin: agentic identity, FIC tokens, Graph calendar/email tools, iptables-enforced perimeter — all in one Docker container | [Phase 2 — `openclaw-a365`](./phase-2-tool-integration-capability-perimeters/README.md) |
+| The composable approach: OpenClaw Gateway + your own Microsoft 365 Agents SDK agent + Agent 365 SDK onboarding via AI-guided setup or `a365` CLI | [TEAMS_COPILOT_INTEGRATION.md](./TEAMS_COPILOT_INTEGRATION.md) |
+| Both (multi-channel personal access **and** an enterprise Teams plugin) | Both — they share the same workspace and skills |
+
 ### Manual start — Phase 1
 
 > Run all `./scripts/*.sh` commands **from the repo root**.
@@ -111,6 +119,7 @@ enterprise-ai-agent-lab/
 │
 ├── README.md                              ← this file
 ├── CodingAgent.md                         ← AI-guided setup for Claude Code / Copilot CLI
+├── TEAMS_COPILOT_INTEGRATION.md           ← OpenClaw + M365 Agents SDK + Agent 365 → Teams/Copilot (two patterns)
 ├── OPENCLAW_ARCHITECTURE.md               ← platform architecture reference
 ├── OPENCLAW_SETUP_GUIDE.md                ← installation & configuration reference
 ├── OPENCLAW_IMPLEMENTATION_GUIDE.md       ← patterns & best practices
@@ -171,6 +180,7 @@ enterprise-ai-agent-lab/
 |---------|---------|
 | [CodingAgent.md](./CodingAgent.md) | AI-guided setup reference for Claude Code / Copilot CLI |
 | [.github/copilot-instructions.md](./.github/copilot-instructions.md) | Condensed reference card for GitHub Copilot |
+| [TEAMS_COPILOT_INTEGRATION.md](./TEAMS_COPILOT_INTEGRATION.md) | **End-to-end developer journey: OpenClaw → M365 Agents SDK → Teams/Copilot → Agent 365 (two patterns + AI-guided setup)** |
 | [phase-1-.../README.md](./phase-1-building-autonomous-ai-assistant/README.md) | Phase 1 — 7-module learning guide |
 | [phase-2-.../README.md](./phase-2-tool-integration-capability-perimeters/README.md) | Phase 2 — 5-module guide + Agent 365 SDK reference |
 | [phase-3-.../README.md](./phase-3-multi-agent-orchestration-governance/README.md) | Phase 3 — multi-agent orchestration spec |

@@ -47,7 +47,8 @@ phase-1-building-autonomous-ai-assistant/
 | **Fix a problem** | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) |
 | **Understand architecture** | [../OPENCLAW_ARCHITECTURE.md](../OPENCLAW_ARCHITECTURE.md) |
 | **Advanced patterns** | [../OPENCLAW_IMPLEMENTATION_GUIDE.md](../OPENCLAW_IMPLEMENTATION_GUIDE.md) |
-| **Go to Phase 2** | [../phase-2-tool-integration-capability-perimeters/README.md](../phase-2-tool-integration-capability-perimeters/README.md) |
+| **Take this to Teams + Copilot (composable path)** | [../TEAMS_COPILOT_INTEGRATION.md](../TEAMS_COPILOT_INTEGRATION.md) |
+| **Go to Phase 2 (packaged plugin path)** | [../phase-2-tool-integration-capability-perimeters/README.md](../phase-2-tool-integration-capability-perimeters/README.md) |
 
 ---
 

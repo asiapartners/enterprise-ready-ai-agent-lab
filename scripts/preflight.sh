@@ -186,6 +186,44 @@ check_phase2() {
     check_warn "No SSH public key found. Generate one: ssh-keygen -t ed25519 -C 'openclaw-deploy'"
   fi
 
+  # Optional tools — only needed for the composable path (TEAMS_COPILOT_INTEGRATION.md)
+  # Path A (gateway-as-hub) and Path B (SDK-standalone) need these; the openclaw-a365
+  # plugin path does not. We surface them as warnings, not failures.
+
+  # Dev Tunnels CLI — exposes localhost:3978 for Azure Bot during development
+  if command -v devtunnel >/dev/null 2>&1; then
+    check_pass "Dev Tunnels CLI: $(devtunnel --version 2>&1 | head -1)"
+  else
+    check_warn "Dev Tunnels CLI not installed (only needed for the composable Pattern A/B path)."
+    echo "    Install: npm install -g @microsoft/dev-tunnels-cli"
+    echo "    Skip if you only deploy the openclaw-a365 plugin to an Azure VM."
+  fi
+
+  # Agent 365 CLI — required for AI-guided setup and 'a365 setup all' / 'a365 publish'
+  if command -v a365 >/dev/null 2>&1; then
+    A365_VER=$(a365 --version 2>/dev/null | head -1 || echo "unknown")
+    check_pass "Agent 365 CLI: $A365_VER"
+  else
+    check_warn "Agent 365 CLI not installed (needed for Tier 1 Register / Tier 4 AI Teammate)."
+    echo "    Install: dotnet tool install -g Microsoft.Agent365.CLI"
+    echo "    Or: npm install -g @microsoft/agent365-cli"
+    echo "    Skip if you stay on direct Graph + manual Entra setup."
+  fi
+
+  # .NET SDK — needed if installing the Agent 365 CLI via dotnet tool, or building .NET samples
+  if command -v dotnet >/dev/null 2>&1; then
+    DOTNET_VER=$(dotnet --version 2>/dev/null | head -1 || echo "unknown")
+    DOTNET_MAJOR="${DOTNET_VER%%.*}"
+    if [ -n "$DOTNET_MAJOR" ] && [ "$DOTNET_MAJOR" -ge 8 ] 2>/dev/null; then
+      check_pass ".NET SDK $DOTNET_VER"
+    else
+      check_warn ".NET SDK $DOTNET_VER — recommend 8.0+ (only needed for 'dotnet tool install -g Microsoft.Agent365.CLI')"
+    fi
+  else
+    check_warn ".NET SDK not installed (needed only if installing Agent 365 CLI via 'dotnet tool install' or building .NET samples)."
+    echo "    Install: see https://dot.net (8.0+)"
+  fi
+
   # .env file
   ENV_PATH="phase-2-tool-integration-capability-perimeters/a365-plugin/.env"
   if [ -f "$ENV_PATH" ]; then

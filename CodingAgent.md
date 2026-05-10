@@ -212,6 +212,35 @@ az monitor activity-log list \
 
 ---
 
+## Two integration patterns — pick first
+
+When the user asks about Teams or Microsoft 365 Copilot integration, **first determine which pattern applies**. The lab supports both, but the implementation steps differ.
+
+| User intent | Pattern | Where to start |
+|-------------|---------|----------------|
+| "Connect my agent to Teams + Slack + Discord + WhatsApp" | **A** — OpenClaw Gateway as multi-channel hub, routes to SDK agent at `localhost:3978` | [`TEAMS_COPILOT_INTEGRATION.md` §5](TEAMS_COPILOT_INTEGRATION.md) |
+| "Build an enterprise Teams bot with Azure AD SSO" | **B** — SDK agent standalone with Azure Bot Service, calls OpenClaw skills via API | [`TEAMS_COPILOT_INTEGRATION.md` §6](TEAMS_COPILOT_INTEGRATION.md) |
+| "Use the openclaw-a365 plugin (single Docker container with FIC tokens + Graph tools + iptables perimeter)" | A (packaged) | [`phase-2-.../README.md`](phase-2-tool-integration-capability-perimeters/README.md) |
+| "I want both — personal multi-channel + enterprise plugin" | Hybrid | Run both; they share workspace + skills |
+
+If the user mentions any of these, walk them through the AI-guided onboarding flow:
+
+- "aka.ms/agent365enable"
+- "AI-guided setup"
+- "Enable my agent for Agent 365"
+- "Register my agent with M365 admin center"
+
+The flow is:
+
+1. Agent must be in VS Code, with **GitHub Copilot Chat in Agent mode** (Ask/Edit modes lack terminal access)
+2. User pastes: `Follow the steps at aka.ms/agent365enable to enable my agent for Agent 365.`
+3. They answer 3 questions: already in Teams? auth model (OBO/S2S/both)? capabilities (Register/Observability/AI Teammate)?
+4. Review the AI-generated code before committing — auto-instrumentation can need tweaks
+
+If Claude Code itself is the AI agent, follow the four Agent 365 capability tiers in order — Register → Observability → Work IQ tooling → AI Teammate. See [`TEAMS_COPILOT_INTEGRATION.md` §11](TEAMS_COPILOT_INTEGRATION.md) for the full tier table.
+
+---
+
 ## Integrating the Agent 365 SDK into OpenClaw
 
 **When the user asks** any of: *"add Agent 365 SDK"*, *"add Work IQ MCP"*, *"add notification handlers"*, *"register MCP servers"*, *"add `mcp_MailTools`"*, *"use `a365` CLI"*, *"`a365 setup all`"*, *"`a365 develop add-mcp-servers`"* — read [`phase-2-.../setup/AGENT_365_SDK_INTEGRATION.md`](phase-2-tool-integration-capability-perimeters/setup/AGENT_365_SDK_INTEGRATION.md) and follow its 7 steps.
@@ -406,6 +435,7 @@ ssh azureuser@<fqdn> 'sudo docker ps -a && sudo docker logs openclaw-a365 --tail
 | Doc | Purpose |
 |-----|---------|
 | [`README.md`](README.md) | Lab overview, tech stack, quick start |
+| [`TEAMS_COPILOT_INTEGRATION.md`](TEAMS_COPILOT_INTEGRATION.md) | **End-to-end: OpenClaw → M365 Agents SDK → Teams/Copilot → Agent 365 (Pattern A vs Pattern B + AI-guided setup)** |
 | [`phase-1-.../README.md`](phase-1-building-autonomous-ai-assistant/README.md) | Phase 1 learning guide (7 modules) |
 | [`phase-2-.../README.md`](phase-2-tool-integration-capability-perimeters/README.md) | Phase 2 guide + Microsoft Agent 365 SDK reference |
 | [`phase-2-.../setup/AZURE_ENTRA_SETUP.md`](phase-2-tool-integration-capability-perimeters/setup/AZURE_ENTRA_SETUP.md) | Step-by-step: app reg, FIC, agent user, AA instance |

@@ -70,6 +70,7 @@ phase-2-tool-integration-capability-perimeters/
 | Handle messages in your agent | [README.md — Handle Messages](./README.md#handle-messages) |
 | Receive notifications (email, docs) | [README.md — Notify Agents](./README.md#notify-agents) |
 | **Wire the Agent 365 SDK into OpenClaw (code-level)** | [setup/AGENT_365_SDK_INTEGRATION.md](./setup/AGENT_365_SDK_INTEGRATION.md) |
+| **Take the composable path instead (Pattern A vs B)** | [../TEAMS_COPILOT_INTEGRATION.md](../TEAMS_COPILOT_INTEGRATION.md) |
 
 ---
 

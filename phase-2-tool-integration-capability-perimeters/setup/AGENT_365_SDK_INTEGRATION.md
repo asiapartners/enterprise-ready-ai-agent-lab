@@ -4,6 +4,8 @@
 
 > **Read first**: [`README.md`](../README.md#microsoft-agent-365-sdk--concepts--integration) for the conceptual overview, then [`AZURE_ENTRA_SETUP.md`](./AZURE_ENTRA_SETUP.md) for the underlying Entra resources.
 
+> **For the broader picture** — how this plugin fits into the two integration patterns (OpenClaw Gateway-as-hub vs. SDK-standalone-with-skills), the Azure Bot setup, Teams sideload, Copilot Studio publishing, and the four Agent 365 capability tiers — see the top-level **[`../../TEAMS_COPILOT_INTEGRATION.md`](../../TEAMS_COPILOT_INTEGRATION.md)**. This guide focuses specifically on wiring the SDK into the existing `a365-plugin/` source.
+
 ---
 
 ## What the SDK actually adds
