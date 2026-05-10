@@ -474,8 +474,3 @@ If you find a new failure mode, add it here and to [docs/rollback.md](docs/rollb
 ## License
 
 MIT © 2026
----
-
-## License
-
-MIT © 2026
