@@ -5,6 +5,16 @@
  * Tests the full Express stack without real Azure credentials.
  */
 
+// Required env must be set BEFORE config.ts is imported (it validates on load).
+process.env.A365_APP_ID = process.env.A365_APP_ID ?? "test-app-id";
+process.env.A365_APP_PASSWORD = process.env.A365_APP_PASSWORD ?? "test-password";
+process.env.A365_TENANT_ID = process.env.A365_TENANT_ID ?? "test-tenant-id";
+process.env.AA_INSTANCE_ID = process.env.AA_INSTANCE_ID ?? "test-instance-id";
+process.env.AGENT_IDENTITY = process.env.AGENT_IDENTITY ?? "agent@test.example.com";
+process.env.OWNER = process.env.OWNER ?? "owner@test.example.com";
+process.env.OWNER_AAD_ID = process.env.OWNER_AAD_ID ?? "test-owner-aad-id";
+process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "test-key";
+
 import request from "supertest";
 import express from "express";
 import { config } from "../../src/config";
@@ -26,18 +36,6 @@ function buildTestApp() {
 
   return app;
 }
-
-// Provide required env for config to parse
-beforeAll(() => {
-  process.env.A365_APP_ID = "test-app-id";
-  process.env.A365_APP_PASSWORD = "test-password";
-  process.env.A365_TENANT_ID = "test-tenant-id";
-  process.env.AA_INSTANCE_ID = "test-instance-id";
-  process.env.AGENT_IDENTITY = "agent@test.example.com";
-  process.env.OWNER = "owner@test.example.com";
-  process.env.OWNER_AAD_ID = "test-owner-aad-id";
-  process.env.ANTHROPIC_API_KEY = "test-key";
-});
 
 describe("GET /health", () => {
   let app: express.Express;

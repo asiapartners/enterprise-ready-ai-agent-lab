@@ -48,19 +48,23 @@ export class Agent365Handler extends ActivityHandler {
             return;
           }
 
-          await ctx.sendActivity({ type: "typing" });
+          // Cast: agents-hosting 1.5.x requires a full Activity instance for the
+          // structured form, but accepts these partials at runtime.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await ctx.sendActivity({ type: "typing" } as any);
 
           const response = await openClawRuntime.processMessage(text, agentCtx);
 
-          await ctx.sendActivity(
-            response.attachments?.length
-              ? {
-                  type: "message",
-                  text: response.text,
-                  attachments: response.attachments as never[],
-                }
-              : response.text
-          );
+          if (response.attachments?.length) {
+            await ctx.sendActivity({
+              type: "message",
+              text: response.text,
+              attachments: response.attachments,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any);
+          } else {
+            await ctx.sendActivity(response.text);
+          }
         } catch (err) {
           span.recordException(err as Error);
           console.error("[agent] onMessage error:", err);
@@ -76,7 +80,7 @@ export class Agent365Handler extends ActivityHandler {
 
     this.onMembersAdded(async (ctx: TurnContext, next) => {
       for (const member of ctx.activity.membersAdded ?? []) {
-        if (member.id !== ctx.activity.recipient.id) {
+        if (member.id !== ctx.activity.recipient?.id) {
           await ctx.sendActivity(
             `👋 Hello! I'm **${config.agentIdentity.split("@")[0]}**, your AI assistant powered by OpenClaw. ` +
               `How can I help you today?`

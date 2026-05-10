@@ -95,6 +95,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     console.info(`[server] Received ${signal} — shutting down gracefully`);
     server.close(async () => {
+      await openClawRuntime.shutdown();
       await shutdownTelemetry();
       process.exit(0);
     });

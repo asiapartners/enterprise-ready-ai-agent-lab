@@ -6,15 +6,23 @@
  *
  *  1. Loads OpenClaw configuration from OPENCLAW_CONFIG_PATH
  *  2. Initialises the plugin registry (loads a365-channel plugin)
- *  3. Routes incoming Bot Framework activities to OpenClaw's event bus
+ *  3. Routes incoming Bot Framework activities to OpenClaw
  *  4. Applies network policy (iptables) when NETWORK_MODE != unrestricted
  *  5. Manages the T1 → T2 → Agent FIC token exchange for Graph API access
+ *
+ * Integration mode resolution (in order):
+ *   a) In-process SDK — `require('openclaw').createRuntime(...)` if installed
+ *   b) HTTP gateway   — POST to OpenClaw's gateway endpoint resolved from
+ *                       OPENCLAW_GATEWAY_URL or config/openclaw-config.json
+ *   c) Stub           — dev-only canned response (APP_ENV=development)
  *
  * Architecture ref: https://github.com/SidU/openclaw-a365
  * Auth flow: T1 (client_creds + fmi_path) → T2 (jwt-bearer) → Agent token (user_fic)
  */
 
 import { execSync } from "child_process";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import { config } from "./config";
 
 export interface AgentContext {
@@ -30,13 +38,41 @@ export interface OpenClawResponse {
   attachments?: unknown[];
 }
 
-/**
- * Minimal OpenClaw runtime interface.
- * In production this delegates to the openclaw package once installed.
- * The openclaw module exposes a plugin API; we register as a channel plugin.
- */
+export type OpenClawMode = "sdk" | "http" | "stub";
+
+interface SdkRuntime {
+  handleMessage(
+    message: string,
+    ctx: { identity: AgentContext; agentIdentity: string }
+  ): Promise<{ text: string; attachments?: unknown[] }>;
+  shutdown?(): Promise<void>;
+}
+
+interface SdkModule {
+  createRuntime(opts: {
+    configPath: string;
+    pluginDir: string;
+    model: string;
+    fallbackModels?: string[];
+  }): Promise<SdkRuntime>;
+}
+
+interface GatewayConfigFile {
+  gateway?: { host?: string; port?: number };
+  agents?: { default?: string };
+}
+
+interface GatewayResponse {
+  response?: string;
+  text?: string;
+  attachments?: unknown[];
+}
+
 class OpenClawRuntime {
   private initialized = false;
+  private mode: OpenClawMode = "stub";
+  private sdkRuntime: SdkRuntime | null = null;
+  private gatewayUrl: string | null = null;
 
   async init(): Promise<void> {
     if (this.initialized) return;
@@ -50,20 +86,56 @@ class OpenClawRuntime {
       await this.applyNetworkPolicy();
     }
 
-    // TODO: Replace with actual OpenClaw SDK initialisation once available:
-    //
-    //   import { createRuntime } from 'openclaw';
-    //   this.runtime = await createRuntime({
-    //     configPath: config.openclawConfigPath,
-    //     pluginDir: config.openclawPluginDir,
-    //     model: config.openclawModel,
-    //     fallbackModels: config.openclawFallbackModels?.split(','),
-    //   });
-    //
-    // The plugin registers itself via openclaw.plugin.json.
+    // 1) Try in-process SDK
+    const sdk = this.tryLoadSdk();
+    if (sdk) {
+      try {
+        this.sdkRuntime = await sdk.createRuntime({
+          configPath: config.openclawConfigPath,
+          pluginDir: config.openclawPluginDir,
+          model: config.openclawModel,
+          fallbackModels: config.openclawFallbackModels
+            ?.split(",")
+            .map((m) => m.trim())
+            .filter(Boolean),
+        });
+        this.mode = "sdk";
+        console.info("[openclaw] In-process runtime ready");
+      } catch (err) {
+        console.warn(
+          "[openclaw] In-process SDK init failed; will try HTTP gateway:",
+          err
+        );
+      }
+    }
+
+    // 2) Fall back to HTTP gateway
+    if (this.mode === "stub") {
+      this.gatewayUrl = this.resolveGatewayUrl();
+      if (this.gatewayUrl) {
+        this.mode = "http";
+        console.info(`[openclaw] Using HTTP gateway: ${this.gatewayUrl}`);
+      }
+    }
+
+    // 3) Stub mode (dev only)
+    if (this.mode === "stub") {
+      if (config.appEnv !== "development") {
+        throw new Error(
+          "[openclaw] No runtime available: install the 'openclaw' package or set OPENCLAW_GATEWAY_URL"
+        );
+      }
+      console.warn(
+        "[openclaw] No SDK or gateway available — using stub responses (development only)"
+      );
+    }
 
     this.initialized = true;
-    console.info("[openclaw] Runtime ready");
+    console.info(`[openclaw] Runtime ready (mode=${this.mode})`);
+  }
+
+  getMode(): OpenClawMode {
+    return this.mode;
   }
 
   /**
@@ -79,20 +151,112 @@ class OpenClawRuntime {
     }
 
     console.info(
-      `[openclaw] Processing message — user=${context.userUpn} role=${context.userRole}`
+      `[openclaw] Processing message — user=${context.userUpn} role=${context.userRole} mode=${this.mode}`
     );
 
-    // TODO: replace stub with actual runtime invocation:
-    //   const result = await this.runtime.handleMessage(message, {
-    //     identity: context,
-    //     agentIdentity: config.agentIdentity,
-    //     tools: this.graphTools,
-    //   });
-    //   return result;
+    if (this.mode === "sdk" && this.sdkRuntime) {
+      const result = await this.sdkRuntime.handleMessage(message, {
+        identity: context,
+        agentIdentity: config.agentIdentity,
+      });
+      return { text: result.text, attachments: result.attachments };
+    }
+
+    if (this.mode === "http" && this.gatewayUrl) {
+      return this.callGateway(message, context);
+    }
 
     // Stub response for local dev / unit tests
     return {
       text: `[OpenClaw stub] Received: "${message}" from ${context.userUpn} (${context.userRole})`,
+    };
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.sdkRuntime?.shutdown) {
+      try {
+        await this.sdkRuntime.shutdown();
+      } catch (err) {
+        console.warn("[openclaw] SDK shutdown error:", err);
+      }
+    }
+    this.sdkRuntime = null;
+    this.gatewayUrl = null;
+    this.mode = "stub";
+    this.initialized = false;
+  }
+
+  private tryLoadSdk(): SdkModule | null {
+    try {
+      // Dynamic require so the absence of the optional 'openclaw' package
+      // does not break startup. Suppress the resolver error for clean logs.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require("openclaw") as Partial<SdkModule>;
+      if (mod && typeof mod.createRuntime === "function") {
+        return mod as SdkModule;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveGatewayUrl(): string | null {
+    const explicit = process.env.OPENCLAW_GATEWAY_URL;
+    if (explicit) {
+      return explicit.replace(/\/+$/, "") + "/chat";
+    }
+
+    const cfgPath = join(config.openclawConfigPath, "openclaw-config.json");
+    if (!existsSync(cfgPath)) return null;
+
+    try {
+      const parsed = JSON.parse(
+        readFileSync(cfgPath, "utf8")
+      ) as GatewayConfigFile;
+      const rawHost = parsed.gateway?.host;
+      const host = rawHost && rawHost !== "0.0.0.0" ? rawHost : "127.0.0.1";
+      const port = parsed.gateway?.port ?? 18789;
+      return `http://${host}:${port}/chat`;
+    } catch (err) {
+      console.warn(
+        `[openclaw] Failed to parse gateway config at ${cfgPath}:`,
+        err
+      );
+      return null;
+    }
+  }
+
+  private async callGateway(
+    message: string,
+    context: AgentContext
+  ): Promise<OpenClawResponse> {
+    const url = this.gatewayUrl as string;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: context.conversationId,
+        message,
+        user: {
+          upn: context.userUpn,
+          aad_id: context.userAadId,
+          role: context.userRole,
+        },
+        channel: context.channelId,
+        agent_identity: config.agentIdentity,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`[openclaw] gateway ${res.status}: ${body}`);
+    }
+
+    const data = (await res.json()) as GatewayResponse;
+    return {
+      text: data.response ?? data.text ?? "",
+      attachments: data.attachments,
     };
   }
 

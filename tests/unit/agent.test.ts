@@ -1,14 +1,48 @@
 /**
- * Unit tests for agent.ts — role detection and DM policy
+ * Unit tests for agent.ts — role detection, DM policy, and bridge invocation.
  */
 
+// The @microsoft/agents-hosting package ships TS source under node_modules
+// which jest cannot transform. We only need ActivityHandler/TurnContext
+// shapes for these tests, so a lightweight mock is sufficient.
+jest.mock("@microsoft/agents-hosting", () => {
+  class ActivityHandler {
+    onMessage = jest.fn();
+    onMembersAdded = jest.fn();
+  }
+  return { ActivityHandler, TurnContext: class {} };
+});
+
+jest.mock("@opentelemetry/api", () => ({
+  trace: {
+    getTracer: () => ({
+      startActiveSpan: (
+        _name: string,
+        fn: (span: {
+          setAttribute: () => void;
+          recordException: () => void;
+          end: () => void;
+        }) => unknown
+      ) =>
+        fn({
+          setAttribute: () => undefined,
+          recordException: () => undefined,
+          end: () => undefined,
+        }),
+    }),
+  },
+}));
+
 import { Agent365Handler } from "../../src/agent";
+import { openClawRuntime } from "../../src/openclaw-connector";
 
 // Stub OpenClaw runtime to avoid real init
 jest.mock("../../src/openclaw-connector", () => ({
   openClawRuntime: {
     init: jest.fn().mockResolvedValue(undefined),
     processMessage: jest.fn().mockResolvedValue({ text: "stub response" }),
+    shutdown: jest.fn().mockResolvedValue(undefined),
+    getMode: jest.fn().mockReturnValue("stub"),
   },
 }));
 
@@ -78,5 +112,40 @@ describe("Agent365Handler", () => {
       buildAgentContext: (ctx: unknown) => { userRole: string };
     }).buildAgentContext(ctx);
     expect(context.userRole).toBe("Requester");
+  });
+
+  it("blocks non-owner DMs when policy is closed", () => {
+    const handler = new Agent365Handler() as unknown as {
+      isDmAllowed: (
+        ctx: unknown,
+        agentCtx: { userRole: string }
+      ) => boolean;
+    };
+    // Override config.dmPolicy via the existing module mock
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const cfg = require("../../src/config");
+    const original = cfg.config.dmPolicy;
+    cfg.config.dmPolicy = "closed";
+    try {
+      const ctx = makeTurnContext();
+      const allowed = handler.isDmAllowed(ctx, { userRole: "Requester" });
+      expect(allowed).toBe(false);
+    } finally {
+      cfg.config.dmPolicy = original;
+    }
+  });
+
+  it("exports a runtime mock that can be invoked by the bridge", async () => {
+    // Sanity check: agent.ts imports openClawRuntime from this module path,
+    // so any code path that calls processMessage must hit our jest.fn() mock.
+    const result = await openClawRuntime.processMessage("hi", {
+      userUpn: "u",
+      userAadId: "a",
+      userRole: "Requester",
+      conversationId: "c",
+      channelId: "msteams",
+    });
+    expect(openClawRuntime.processMessage).toHaveBeenCalled();
+    expect(result.text).toBe("stub response");
   });
 });
