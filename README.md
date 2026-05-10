@@ -448,7 +448,7 @@ If you find a new failure mode, add it here and to [docs/rollback.md](docs/rollb
 
 | Term | Meaning |
 |---|---|
-| **Agent 365**           | Microsoft's framework for building agents with their own identity, governed by Entra ID and Microsoft Graph. |
+| **Agent 365**           | The Control Plane for Agents Observe, govern, and secure AI agents confidently with Agent 365. Extend Microsoft 365 and Microsoft Security controls to manage agentic AI at scale. |
 | **Agentic identity**    | A non-human Entra ID user that an agent acts *as*. Receives delegations and shows up as the actor in audit logs. |
 | **CloudAdapter**        | The `@microsoft/agents-hosting` adapter that validates Bot Framework JWTs and dispatches turns. |
 | **FIC (Federated Identity Credential)** | An AAD construct that lets an app federate trust into another identity without storing the target's credentials. |
