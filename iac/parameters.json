@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment":     { "value": "development" },
+    "location":        { "value": "eastus" },
+    "namePrefix":      { "value": "oca365" },
+    "containerImage":  { "value": "REPLACE_ME.azurecr.io/openclaw-agent365:latest" },
+    "a365AppId":       { "value": "REPLACE_ME-app-id-guid" },
+    "aaInstanceId":    { "value": "REPLACE_ME-aa-instance-id" },
+    "agentIdentity":   { "value": "agent@your-tenant.onmicrosoft.com" },
+    "owner":           { "value": "owner@your-tenant.onmicrosoft.com" },
+    "ownerAadId":      { "value": "REPLACE_ME-owner-object-id" },
+    "openclawModel":   { "value": "anthropic/claude-opus-4-6" }
+  }
+}

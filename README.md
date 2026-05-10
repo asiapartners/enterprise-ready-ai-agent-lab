@@ -167,9 +167,64 @@ See [.env.example](.env.example) for the full template. Key variables:
 
 ---
 
+## Azure CLI setup
+
+Bash scripts under [scripts/](scripts/) automate every Azure operation that was previously documented as a comment in [iac/azure-resources.bicep](iac/azure-resources.bicep). They are idempotent, support `AZ_DRY_RUN=1`, and emit JSON summaries to stdout for CI consumption.
+
+### Script catalogue
+
+| Script | `pnpm` alias | Purpose |
+|---|---|---|
+| [scripts/install-azure-cli.sh](scripts/install-azure-cli.sh)        | `pnpm run az:install`   | Install/upgrade `az` (apt/brew/winget) + ext: `containerapp`, `bot-service`, `application-insights` |
+| [scripts/azure-login.sh](scripts/azure-login.sh)                    | `pnpm run az:login`     | `az login` via device-code (interactive) or service-principal (CI), select subscription |
+| [scripts/azure-app-registration.sh](scripts/azure-app-registration.sh) | `pnpm run az:app-reg`   | Create AAD App + Graph permissions + admin consent + client secret + Federated Identity Credential |
+| [scripts/azure-provision.sh](scripts/azure-provision.sh)            | `pnpm run az:provision` | Validate + deploy [iac/azure-resources.bicep](iac/azure-resources.bicep); cache outputs to `iac/.last-deployment.json` |
+| [scripts/azure-keyvault-seed.sh](scripts/azure-keyvault-seed.sh)    | `pnpm run az:kv-seed`   | Push `.env` secrets into Key Vault; `--sync-env` writes deployment outputs back to `.env` |
+| [scripts/azure-deploy-image.sh](scripts/azure-deploy-image.sh)      | `pnpm run az:deploy`    | `az acr build` → `az containerapp update` → poll revision → curl `/health` |
+| [scripts/azure-teardown.sh](scripts/azure-teardown.sh)              | `pnpm run az:teardown`  | Safe RG delete (refuses untagged RGs and prod-named subs unless overridden) |
+
+### End-to-end first deploy
+
+```bash
+# 0. Tooling — run once per machine
+pnpm run az:install
+
+# 1. Authenticate (interactive). For CI use --service-principal with AZ_CLIENT_ID/AZ_CLIENT_SECRET/AZ_TENANT_ID.
+pnpm run az:login
+
+# 2. Create the App Registration + FIC and write IDs into .env
+pnpm run az:app-reg -- \
+  --display-name "openclaw-agent365-dev" \
+  --agent-identity agent@<your-domain> \
+  --write-env
+
+# 3. Edit iac/parameters.json with your values, then provision
+AZ_RESOURCE_GROUP=rg-oca365-dev AZ_LOCATION=eastus pnpm run az:provision
+
+# 4. Push secrets from .env → Key Vault (and sync KV URI back into .env)
+pnpm run az:kv-seed -- --sync-env
+
+# 5. Build + roll out the container
+pnpm run az:deploy
+
+# Cleanup (development RGs only — refuses untagged RGs):
+pnpm run az:teardown -- --resource-group rg-oca365-dev
+```
+
+### CI / non-interactive use
+
+Every script reads its parameters from environment variables and exits non-zero if anything is missing. Set `AZ_DRY_RUN=1` to preview commands (`what-if` for provision, log-only for the rest). Service-principal login example:
+
+```bash
+AZ_CLIENT_ID=...  AZ_CLIENT_SECRET=...  AZ_TENANT_ID=... \
+  pnpm run az:login -- --service-principal
+```
+
+---
+
 ## Publishing to Teams / Copilot
 
-1. Complete the [Azure AD App Registration](iac/azure-resources.bicep) (app manifest permissions included).
+1. Run `pnpm run az:app-reg` to register the app and create the FIC. Graph permissions (`User.Read`, `Calendars.ReadWrite`, `Mail.Send`) are added and admin-consented automatically.
 2. Package the Teams app manifest: follow the [Agent365 platform hosting patterns](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/).
 3. Submit via Teams Admin Center or Microsoft Partner Center.
 4. Run the post-publish smoke test in [docs/release-checklist.md](docs/release-checklist.md).

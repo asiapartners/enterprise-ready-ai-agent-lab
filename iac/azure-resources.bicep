@@ -290,21 +290,21 @@ output containerAppPrincipalId string = containerApp.identity.principalId
 output botServiceName string = botService.name
 output botMessagingEndpoint string = botService.properties.endpoint
 
-// ─── Manual steps after deployment ───────────────────────────────────────────
-// 1. App Registration (Azure AD):
-//    az ad app create --display-name "openclaw-agent365-${environment}" \
-//      --sign-in-audience AzureADMyOrg
-//    az ad app permission add --id <APP_ID> \
-//      --api 00000003-0000-0000-c000-000000000000 \
-//      --api-permissions e1fe6dd8-ba31-4d61-89e7-88639da4683d=Scope  # User.Read
-//    # Add Calendars.ReadWrite, Mail.Send as app permissions for agentic identity
-//    az ad app permission grant-admin-consent --id <APP_ID>
+// ─── Post-deployment steps ───────────────────────────────────────────────────
+// The following operations are automated by scripts/ — do not run them by hand.
 //
-// 2. Register with Microsoft Agent 365:
-//    Follow: https://learn.microsoft.com/en-us/microsoft-agent-365/developer/registration
+//   App Registration + FIC + admin consent:
+//     pnpm run az:app-reg -- --display-name "openclaw-agent365-${environment}" \
+//                            --agent-identity <upn> --write-env
 //
-// 3. Add secrets to Key Vault:
-//    az keyvault secret set --vault-name kv-${suffix} --name A365-APP-PASSWORD --value <secret>
-//    az keyvault secret set --vault-name kv-${suffix} --name ANTHROPIC-API-KEY --value <key>
-//    az keyvault secret set --vault-name kv-${suffix} --name APPINSIGHTS-CONNECTION-STRING \
-//      --value "$(az monitor app-insights component show --app ai-${suffix} -g <rg> --query connectionString -o tsv)"
+//   Seed Key Vault from .env (A365_APP_PASSWORD, ANTHROPIC_API_KEY,
+//   APPINSIGHTS_CONNECTION_STRING, optional LLM keys):
+//     pnpm run az:kv-seed
+//
+//   Build image + roll out new Container App revision:
+//     pnpm run az:deploy
+//
+//   Tear down (development RGs only):
+//     pnpm run az:teardown -- --resource-group <rg>
+//
+// See README → "Azure CLI setup" and docs/release-checklist.md.

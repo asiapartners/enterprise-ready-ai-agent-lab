@@ -14,7 +14,14 @@
     "test:all": "jest --coverage --forceExit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
-    "setup": "bash scripts/setup.sh"
+    "setup": "bash scripts/setup.sh",
+    "az:install":   "bash scripts/install-azure-cli.sh",
+    "az:login":     "bash scripts/azure-login.sh",
+    "az:app-reg":   "bash scripts/azure-app-registration.sh",
+    "az:provision": "bash scripts/azure-provision.sh",
+    "az:kv-seed":   "bash scripts/azure-keyvault-seed.sh",
+    "az:deploy":    "bash scripts/azure-deploy-image.sh",
+    "az:teardown":  "bash scripts/azure-teardown.sh"
   },
   "packageManager": "pnpm@9.0.0",
   "dependencies": {

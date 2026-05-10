@@ -30,7 +30,24 @@ Run this checklist for every production release. Copy to a GitHub Issue or PR de
 
 ## Release (release engineer)
 
-### Tag & Build
+### Azure deployment (manual path)
+
+If `release.yml` is unavailable, the same release can be cut from a workstation using the [scripts/](../scripts/) automation. Run in this order — each step is idempotent:
+
+```bash
+pnpm run az:login                                                 # device-code or --service-principal
+pnpm run az:app-reg -- --display-name "openclaw-agent365-prod" \
+                       --agent-identity agent@<domain> --write-env
+AZ_RESOURCE_GROUP=rg-oca365-prod pnpm run az:provision            # validates + deploys bicep
+pnpm run az:kv-seed -- --sync-env                                 # .env → Key Vault
+IMAGE_TAG=v<MAJOR>.<MINOR>.<PATCH> pnpm run az:deploy             # build + roll out + health check
+```
+
+- [ ] `iac/.last-deployment.json` written with this release's outputs
+- [ ] `pnpm run az:deploy` reports `Revision … Succeeded` and `/health` passes
+- [ ] Image digest recorded from `az acr repository show-manifests` for rollback
+
+### Tag & Build (CI path)
 ```bash
 # Create signed tag
 git tag -s v<MAJOR>.<MINOR>.<PATCH> -m "Release v<MAJOR>.<MINOR>.<PATCH>"

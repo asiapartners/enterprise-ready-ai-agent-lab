@@ -17,17 +17,9 @@
 # =============================================================================
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-pass()  { echo -e "${GREEN}✔${NC}  $*"; }
-warn()  { echo -e "${YELLOW}⚠${NC}  $*"; }
-fail()  { echo -e "${RED}✖${NC}  $*"; exit 1; }
-info()  { echo -e "${CYAN}→${NC}  $*"; }
-title() { echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"; echo -e "  $*"; echo -e "${CYAN}═══════════════════════════════════════════${NC}"; }
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
 
 # ─── 1. Tool version checks ──────────────────────────────────────────────────
 title "openclaw-agent365 — Dev Setup"
@@ -74,7 +66,16 @@ if command -v az &>/dev/null; then
   AZ_VER=$(az --version 2>/dev/null | head -1 | awk '{print $2}')
   pass "Azure CLI $AZ_VER"
 else
-  warn "Azure CLI not found (optional, required for Azure deployments): https://aka.ms/install-azure-cli"
+  warn "Azure CLI not found (optional, required for Azure deployments)"
+  if is_interactive; then
+    if confirm "Install Azure CLI now via scripts/install-azure-cli.sh?"; then
+      bash "$SCRIPT_DIR/install-azure-cli.sh" || warn "Azure CLI install failed (continuing setup)"
+    else
+      info "Skip — install later with: pnpm run az:install"
+    fi
+  else
+    info "Non-interactive mode — install later with: pnpm run az:install"
+  fi
 fi
 
 # k6 (optional, for load tests)
