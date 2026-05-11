@@ -1,40 +1,17 @@
-# Phase 1 Setup Steps
-
-Detailed installation and configuration guide for Phase 1.
-
----
+# Phase 1 Setup Steps - Detailed Installation Guide
 
 ## Prerequisites Checklist
 
 Before you start, ensure you have:
 
-- [ ] macOS 11+, Linux (Ubuntu 20.04+), or Windows 10+ with WSL2
-- [ ] Node.js 22.14+ or Node 24+ installed
-- [ ] npm or pnpm available
-- [ ] Azure OpenAI credentials (or another supported LLM provider):
-  - [ ] API key from your chosen provider
-  - [ ] Endpoint URL (for Azure)
-- [ ] 2GB free disk space
-- [ ] Internet connection
-
-### Verify Prerequisites
-
-```bash
-# Check Node.js version
-node --version  # Should be v22.14.0 or higher
-
-# Check npm
-npm --version
-
-# Test internet connectivity
-ping api.openai.com  # or your API provider
-```
-
----
+- [ ] Permissions to deploy a Windows Azure VM
+  - [ ] VM Specs
+  - [ ] Outbound internet connectivity
+- [ ] Azure OpenAI credentials:
+  - [ ] Azure subscription with OpenAI resource
+  - [ ] API key and endpoint from Azure portal
 
 ## Step 1: Install OpenClaw
-
-### Option A: Global Install (Recommended)
 
 ```bash
 # Install latest stable version
@@ -43,42 +20,6 @@ npm install -g openclaw@latest
 # Verify installation
 openclaw --version
 ```
-
-### Option B: From Source (Development)
-
-```bash
-# Clone repository
-git clone https://github.com/openclaw/openclaw.git
-cd openclaw
-
-# Install with pnpm
-npm install -g pnpm
-pnpm install
-
-# Build
-pnpm build
-
-# Run setup
-pnpm openclaw setup
-
-# Start gateway (dev mode with auto-reload)
-pnpm gateway:watch
-```
-
-### Option C: Docker
-
-```bash
-# Build Docker image
-docker build -t openclaw:latest .
-
-# Run in container
-docker run -it \
-  -e OPENAI_API_KEY=your_key_here \
-  -v ~/.openclaw:/root/.openclaw \
-  openclaw:latest \
-  openclaw onboard
-```
-
 ---
 
 ## Step 2: Run Onboarding
@@ -149,9 +90,6 @@ OpenClaw creates the following structure:
 Open `~/.openclaw/openclaw.json`:
 
 ```bash
-# macOS/Linux
-nano ~/.openclaw/openclaw.json
-
 # Windows (PowerShell)
 notepad $env:USERPROFILE\.openclaw\openclaw.json
 ```
@@ -164,7 +102,7 @@ notepad $env:USERPROFILE\.openclaw\openclaw.json
   agents: {
     defaults: {
       model: "azure/gpt-4",             // Azure OpenAI deployment
-      temperature: 0.7,                 // 0.0 (deterministic) to 1.0 (creative)
+      temperature: 0.7,                // 0.0 (deterministic) to 1.0 (creative)
       maxTokens: 4096,
     }
   },
@@ -178,7 +116,7 @@ notepad $env:USERPROFILE\.openclaw\openclaw.json
   // Optional: Model failover
   modelFailover: [
     "openai/gpt-4o",
-    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-3-5-sonnet",
     "openai/gpt-4-turbo",
   ],
 }
@@ -304,7 +242,7 @@ openclaw agent --message "What is the current time?"
 ### Test 4: Multi-step Task
 
 ```bash
-openclaw agent --message "Search for the latest AI news and save a summary to a file"
+openclaw agent --message "Search for the latest OpenClaw releases and summarize the features"
 ```
 
 ---
@@ -351,7 +289,7 @@ curl http://localhost:18789/health
 2. **Get Credentials**
    - In Bot Service → Settings → Configuration
    - Copy your **Microsoft App ID** and **Client Secret**
-   - Save securely (never commit to git)
+   - Save temporarily (treat like passwords)
 
 3. **Configure in `openclaw.json`**
    ```json5
@@ -376,6 +314,62 @@ curl http://localhost:18789/health
    - Agent should respond
 
 **For detailed setup**: See [TEAMS_SETUP.md](./TEAMS_SETUP.md)
+
+---
+
+## Troubleshooting
+
+### Issue: "openclaw: command not found"
+
+```bash
+# Solution: Ensure npm global path is in PATH
+npm config get prefix
+
+# Add to ~/.bashrc or ~/.zshrc:
+export PATH="$(npm config get prefix)/bin:$PATH"
+```
+
+### Issue: API Key Not Found
+
+```bash
+# Solution: Verify environment variable
+echo $OPENAI_API_KEY  # Should not be empty
+
+# If empty, set it:
+export OPENAI_API_KEY="sk-..."
+```
+
+### Issue: Port 18789 Already in Use
+
+```bash
+# Use different port
+openclaw gateway --port 18790 --verbose
+
+# Or find process using port 18789:
+lsof -i :18789
+kill -9 <PID>
+```
+
+### Issue: "Cannot find AGENTS.md"
+
+```bash
+# Solution: Run setup
+openclaw setup
+
+# Or manually create:
+mkdir -p ~/.openclaw/workspace
+touch ~/.openclaw/workspace/AGENTS.md
+```
+
+---
+
+## Next Steps
+
+1. **Customize Agent Personality** → Edit `AGENTS.md` and `SOUL.md`
+2. **Add Skills** → Create skills in `~/.openclaw/workspace/skills/`
+3. **Configure Tools** → Modify tool policies in `openclaw.json`
+4. **Set Up Microsoft Teams** → Follow [TEAMS_SETUP.md](./TEAMS_SETUP.md)
+5. **Create Memory** → Add facts to `MEMORY.md`
 
 ---
 
@@ -423,3 +417,62 @@ openclaw logs tail
 ---
 
 **Ready for Module 3? Move to [AGENT_PERSONALITY.md](./AGENT_PERSONALITY.md)**
+
+
+# OpenClaw Setup & Configuration Guide
+
+## Table of Contents
+
+1. [Installation](#installation)\
+1. [Channel Setup](#channel-setup)
+1. [Agent Configuration](#agent-configuration)
+1. [Advanced Scenarios](#advanced-scenarios)
+1. [Troubleshooting](#troubleshooting)
+
+---
+
+## Installation
+
+### Prerequisites
+
+- **Node.js**: [MSI Install here](https://nodejs.org/en/download)
+- **Disk Space**: 500MB minimum, 2GB+ recommended
+- **Memory**: 1GB RAM minimum, 2GB+ recommended
+- **Network**: Internet for LLM API calls; local network or VPN for Gateway access
+
+#### Windows Installation
+
+```bash
+# Install OpenClaw via npm
+npm install -g openclaw@latest
+
+# Run the OpenClaw onboarding process
+openclaw onboard --install-daemon
+
+```
+---
+
+## Channel Setup
+
+### Microsoft Teams
+```bash
+# Install OpenClaw via npm
+npm install -g openclaw@latest
+
+# Run the OpenClaw onboarding process
+openclaw onboard --install-daemon
+
+# Install the Teams Toolkit CLI 
+npm install -g @microsoft/teams.cli@preview
+teams login
+teams app create --name "OpenClaw" --endpoint "https://<your-tunnel-url>/api/messages"
+teams app get <teamsAppId> --install-link
+
+# Install DevTunnels
+Invoke-WebRequest -Uri https://aka.ms/TunnelsCliDownload/win-x64 -OutFile devtunnel.exe
+.\devtunnel user login
+.\devtunnel create app-openclaw --allow-anonymous
+.\devtunnel port create app-openclaw -p 3978 --protocol auto
+.\devtunnel host app-openclaw
+
+```

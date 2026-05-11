@@ -114,7 +114,7 @@ Error: OPENAI_API_KEY not found
 4. Verify:
    ```bash
    echo $OPENAI_API_KEY
-   # Should show your key
+   # Should show your key (or part of it)
    ```
 
 5. Test:
@@ -184,10 +184,7 @@ Error: Model 'openai/gpt4' not found
    model: "openai/gpt-4o"
    
    # For Anthropic
-   model: "anthropic/claude-sonnet-4-6"
-   
-   # For Azure OpenAI
-   model: "azure/gpt-4"
+   model: "anthropic/claude-3-5-sonnet-20241022"
    ```
 
 ---
@@ -214,6 +211,11 @@ Error: Address already in use :::18789
    
    # Kill it
    kill -9 <PID>
+   ```
+
+3. Or check what's using the port:
+   ```bash
+   netstat -tulpn | grep 18789
    ```
 
 ---
@@ -246,6 +248,11 @@ Error: Failed to start gateway
    openclaw gateway --port 18789 --verbose
    ```
 
+5. Ensure API key is set:
+   ```bash
+   echo $OPENAI_API_KEY
+   ```
+
 ---
 
 ### Issue: Gateway is running but agent doesn't respond
@@ -259,12 +266,19 @@ Error: Failed to start gateway
    # Should return: {"status":"ok"}
    ```
 
-2. Check logs for errors:
+2. Check if API is working:
+   ```bash
+   curl -X POST http://localhost:18789/agent \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Hello"}'
+   ```
+
+3. Check logs for errors:
    ```bash
    openclaw logs tail -f
    ```
 
-3. Verify LLM connection:
+4. Verify LLM connection:
    ```bash
    openclaw config test-llm
    ```
@@ -288,7 +302,14 @@ Error: Failed to start gateway
    openclaw gateway restart
    ```
 
-3. Test directly:
+3. Check for syntax errors:
+   ```bash
+   # AGENTS.md should follow Markdown format
+   # Should start with: # agent:main
+   # Should have proper sections
+   ```
+
+4. Test directly:
    ```bash
    openclaw agent --message "Describe yourself"
    ```
@@ -297,7 +318,7 @@ Error: Failed to start gateway
 
 ### Issue: Agent can't read/write files
 
-**Symptom**: Agent says "I cannot access files"
+**Symptom**: Agent says "I cannot access files" or files don't get created
 
 **Solution**:
 1. Check file tools are enabled in openclaw.json:
@@ -315,14 +336,23 @@ Error: Failed to start gateway
 2. Verify permissions:
    ```bash
    ls -la ~/.openclaw/workspace/
+   # Should be readable and writable
    chmod 755 ~/.openclaw/workspace
+   ```
+
+3. Test file tool:
+   ```bash
+   openclaw agent --message "Create a test file called test.txt"
+   
+   # Check if created
+   ls -la ~/.openclaw/workspace/test.txt
    ```
 
 ---
 
 ### Issue: Agent won't run bash commands
 
-**Symptom**: Agent says "I cannot run bash"
+**Symptom**: Agent says "I cannot run bash" or command doesn't execute
 
 **Solution**:
 1. Enable bash in config:
@@ -335,16 +365,62 @@ Error: Failed to start gateway
    }
    ```
 
-2. Restart gateway and test:
+2. Restart gateway:
+   ```bash
+   openclaw gateway restart
+   ```
+
+3. Check for blocked commands:
+   ```json5
+   tools: {
+     bash: {
+       blocked: [
+         "rm -rf /",
+         "sudo rm",
+       ]
+     }
+   }
+   ```
+
+4. Test bash:
    ```bash
    openclaw agent --message "What is the current date?"
    ```
 
 ---
 
+### Issue: Agent returns "Tool not available"
+
+**Symptom**:
+```
+I cannot use that tool - it's not available in my configuration
+```
+
+**Solution**:
+1. Check config for tool:
+   ```bash
+   grep -A5 "browser:" ~/.openclaw/openclaw.json
+   ```
+
+2. Enable tool:
+   ```json5
+   tools: {
+     browser: {
+       enabled: true,
+     }
+   }
+   ```
+
+3. Restart gateway
+4. Test: `openclaw agent --message "Search for Python"`
+
+---
+
 ## Microsoft Teams Integration Issues
 
 ### Issue: Bot doesn't respond in Teams
+
+**Symptom**: Message bot in Teams or channel, no response
 
 **Solution 1**: Check gateway is running
 ```bash
@@ -362,6 +438,12 @@ grep -A 2 "teams:" ~/.openclaw/openclaw.json
 2. Select your bot resource
 3. Channels → Teams → Configure
 4. Verify messaging is enabled
+
+**Solution 4**: Check Teams app installed correctly
+```bash
+# In Teams, verify the app is listed in "Apps"
+# You may need to sideload or install from org app store
+```
 
 ---
 
@@ -381,13 +463,39 @@ Error: Invalid bot ID or password
    nano ~/.openclaw/openclaw.json
    # Update botId and botPassword fields
    ```
-5. Restart gateway
+5. Restart gateway:
+   ```bash
+   openclaw gateway restart
+   ```
+
+---
+
+### Issue: Can't find bot in Teams
+
+**Symptom**: Bot app not visible in Teams after installation
+
+**Solution**:
+1. Verify app is installed:
+   - Teams → Apps → Manage your apps
+   - Search for your app name
+   
+2. For sideloading:
+   - Upload manifest.json via App Studio
+   - Or use Azure Portal to get installation link
+
+3. Install via direct link:
+   ```
+   https://teams.microsoft.com/l/app/{appId}
+   ```
+   (Get appId from Azure Bot Service)
 
 ---
 
 ## Memory & Context Issues
 
 ### Issue: Agent forgets previous conversations
+
+**Symptom**: Agent doesn't remember what you told it in previous sessions
 
 **Solution**:
 1. Check memory is enabled:
@@ -410,6 +518,10 @@ Error: Invalid bot ID or password
    - Prefers detailed explanations
    - Works with Python and JavaScript
    - Timezone: US Eastern
+   
+   # Previous Learnings
+   - User's project structure: ...
+   - Important tools used: ...
    ```
 
 4. Test:
@@ -423,22 +535,34 @@ Error: Invalid bot ID or password
 
 ### Issue: Agent responses are slow
 
+**Symptom**: `openclaw agent` command takes 10+ seconds
+
 **Solution**:
 1. Use faster model:
    ```json5
-   model: "anthropic/claude-haiku-4-5-20251001"  // Faster, cheaper
+   model: "anthropic/claude-3-5-haiku-20241022"  // Faster, cheaper
    ```
 
 2. Reduce token limits:
    ```json5
-   maxTokens: 2048
+   maxTokens: 2048  // Smaller responses
+   contextLimits: {
+     toolResultMaxChars: 5000,
+   }
    ```
 
-3. Check network connectivity to API provider.
+3. Check network:
+   ```bash
+   # Test API connectivity
+   curl https://api.openai.com/v1/models \
+     -H "Authorization: Bearer $OPENAI_API_KEY"
+   ```
 
 ---
 
 ### Issue: High API costs
+
+**Symptom**: Spending more than expected
 
 **Solution**:
 1. Track usage:
@@ -448,15 +572,18 @@ Error: Invalid bot ID or password
 
 2. Use cheaper model:
    ```json5
-   model: "anthropic/claude-haiku-4-5-20251001"  // ~90% cheaper
+   model: "anthropic/claude-3-5-haiku-20241022"  // ~90% cheaper than GPT-4
    ```
 
-3. Use local model (Ollama):
+3. Use local model:
    ```bash
+   # Install Ollama
    brew install ollama
-   ollama pull llama3
+   ollama pull llama2
    ollama serve
-   # Configure: model: "ollama/llama3"  // Free!
+   
+   # Configure:
+   model: "ollama/llama2"  // Free!
    ```
 
 4. Set budget limit:
@@ -482,12 +609,13 @@ If you're stuck:
 
 ## Success Checklist
 
-✅ `openclaw --version` shows a version  
-✅ `openclaw doctor` shows all checks passing  
-✅ `openclaw agent --message "Hi"` returns a response  
-✅ Your agent responds with your defined personality  
-✅ Agent can read and write files  
-✅ Gateway starts without errors  
-✅ (Optional) Teams bot responds to messages  
+✅ `openclaw --version` shows a version
+✅ `openclaw doctor` shows all checks passing
+✅ `openclaw agent --message "Hi"` returns a response
+✅ Your agent responds with your defined personality
+✅ Agent can read and write files
+✅ Gateway starts without errors
+✅ (Optional) Teams bot responds to messages
 
-When all checked, you're ready for Phase 2!
+When all checked, you're ready for Module 3!
+
