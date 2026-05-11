@@ -4,33 +4,14 @@
 
 Before you start, ensure you have:
 
-- [ ] macOS 11+, Linux (Ubuntu 20.04+), or Windows 10+ with WSL2
-- [ ] Node.js 22.14+ or Node 24+ installed
-- [ ] npm or pnpm available
+- [ ] Permissions to deploy a Windows Azure VM
+  - [ ] VM Specs
+  - [ ] Outbound internet connectivity
 - [ ] Azure OpenAI credentials:
   - [ ] Azure subscription with OpenAI resource
   - [ ] API key and endpoint from Azure portal
-- [ ] 2GB free disk space
-- [ ] Internet connection
-
-### Verify Prerequisites
-
-```bash
-# Check Node.js version
-node --version  # Should be v22.14.0 or higher
-
-# Check npm
-npm --version
-
-# Test internet connectivity
-ping api.openai.com  # or your API provider
-```
-
----
 
 ## Step 1: Install OpenClaw
-
-### Option A: Global Install (Recommended)
 
 ```bash
 # Install latest stable version
@@ -39,42 +20,6 @@ npm install -g openclaw@latest
 # Verify installation
 openclaw --version
 ```
-
-### Option B: From Source (Development)
-
-```bash
-# Clone repository
-git clone https://github.com/openclaw/openclaw.git
-cd openclaw
-
-# Install with pnpm
-npm install -g pnpm
-pnpm install
-
-# Build
-pnpm build
-
-# Run setup
-pnpm openclaw setup
-
-# Start gateway (dev mode with auto-reload)
-pnpm gateway:watch
-```
-
-### Option C: Docker
-
-```bash
-# Build Docker image
-docker build -t openclaw:latest .
-
-# Run in container
-docker run -it \
-  -e OPENAI_API_KEY=your_key_here \
-  -v ~/.openclaw:/root/.openclaw \
-  openclaw:latest \
-  openclaw onboard
-```
-
 ---
 
 ## Step 2: Run Onboarding
@@ -145,9 +90,6 @@ OpenClaw creates the following structure:
 Open `~/.openclaw/openclaw.json`:
 
 ```bash
-# macOS/Linux
-nano ~/.openclaw/openclaw.json
-
 # Windows (PowerShell)
 notepad $env:USERPROFILE\.openclaw\openclaw.json
 ```
@@ -475,3 +417,62 @@ openclaw logs tail
 ---
 
 **Ready for Module 3? Move to [AGENT_PERSONALITY.md](./AGENT_PERSONALITY.md)**
+
+
+# OpenClaw Setup & Configuration Guide
+
+## Table of Contents
+
+1. [Installation](#installation)\
+1. [Channel Setup](#channel-setup)
+1. [Agent Configuration](#agent-configuration)
+1. [Advanced Scenarios](#advanced-scenarios)
+1. [Troubleshooting](#troubleshooting)
+
+---
+
+## Installation
+
+### Prerequisites
+
+- **Node.js**: [MSI Install here](https://nodejs.org/en/download)
+- **Disk Space**: 500MB minimum, 2GB+ recommended
+- **Memory**: 1GB RAM minimum, 2GB+ recommended
+- **Network**: Internet for LLM API calls; local network or VPN for Gateway access
+
+#### Windows Installation
+
+```bash
+# Install OpenClaw via npm
+npm install -g openclaw@latest
+
+# Run the OpenClaw onboarding process
+openclaw onboard --install-daemon
+
+```
+---
+
+## Channel Setup
+
+### Microsoft Teams
+```bash
+# Install OpenClaw via npm
+npm install -g openclaw@latest
+
+# Run the OpenClaw onboarding process
+openclaw onboard --install-daemon
+
+# Install the Teams Toolkit CLI 
+npm install -g @microsoft/teams.cli@preview
+teams login
+teams app create --name "OpenClaw" --endpoint "https://<your-tunnel-url>/api/messages"
+teams app get <teamsAppId> --install-link
+
+# Install DevTunnels
+Invoke-WebRequest -Uri https://aka.ms/TunnelsCliDownload/win-x64 -OutFile devtunnel.exe
+.\devtunnel user login
+.\devtunnel create app-openclaw --allow-anonymous
+.\devtunnel port create app-openclaw -p 3978 --protocol auto
+.\devtunnel host app-openclaw
+
+```
