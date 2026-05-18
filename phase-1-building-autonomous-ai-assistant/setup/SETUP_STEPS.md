@@ -164,122 +164,6 @@ openclaw agent --message "Search for the latest OpenClaw releases and summarize 
 
 ---
 
-## Step 9: Run the Gateway
-
-The Gateway is the central service that:
-- Routes messages from channels
-- Manages sessions
-- Coordinates tool execution
-- Handles auth and security
-
-### Start the Gateway
-
-```bash
-# Foreground (useful for debugging)
-openclaw gateway --port 18789 --verbose
-
-# Or use daemon (if installed with --install-daemon)
-# It runs as a background service
-```
-
-### Verify Gateway is Running
-
-```bash
-# In another terminal
-curl http://localhost:18789/health
-
-# Should return: {"status":"ok"}
-```
-
----
-
-## Step 10: Set Up Your First Channel (Optional)
-
-### Microsoft Teams (Recommended for Phase 1)
-
-1. **Create Azure Bot Service**
-   - Go to https://portal.azure.com
-   - Create a new "Bot Service" resource
-   - Fill in required fields (name, subscription, resource group, location)
-   - Wait for deployment
-
-2. **Get Credentials**
-   - In Bot Service → Settings → Configuration
-   - Copy your **Microsoft App ID** and **Client Secret**
-   - Save temporarily (treat like passwords)
-
-3. **Configure in `openclaw.json`**
-   ```json5
-   channels: {
-     teams: {
-       enabled: true,
-       botId: "your_microsoft_app_id",
-       botPassword: "your_client_secret",
-     }
-   }
-   ```
-
-4. **Install Bot in Teams**
-   - Go to Bot Service → Channels
-   - Click "Configure Microsoft Teams Channel"
-   - Accept terms and save
-   - Click on Teams channel link to install
-
-5. **Test**
-   - Search for your bot in Teams
-   - Send message: "Hello!"
-   - Agent should respond
-
-**For detailed setup**: See [TEAMS_SETUP.md](./TEAMS_SETUP.md)
-
----
-
-## Troubleshooting
-
-### Issue: "openclaw: command not found"
-
-```bash
-# Solution: Ensure npm global path is in PATH
-npm config get prefix
-
-# Add to ~/.bashrc or ~/.zshrc:
-export PATH="$(npm config get prefix)/bin:$PATH"
-```
-
-### Issue: API Key Not Found
-
-```bash
-# Solution: Verify environment variable
-echo $OPENAI_API_KEY  # Should not be empty
-
-# If empty, set it:
-export OPENAI_API_KEY="sk-..."
-```
-
-### Issue: Port 18789 Already in Use
-
-```bash
-# Use different port
-openclaw gateway --port 18790 --verbose
-
-# Or find process using port 18789:
-lsof -i :18789
-kill -9 <PID>
-```
-
-### Issue: "Cannot find AGENTS.md"
-
-```bash
-# Solution: Run setup
-openclaw setup
-
-# Or manually create:
-mkdir -p ~/.openclaw/workspace
-touch ~/.openclaw/workspace/AGENTS.md
-```
-
----
-
 ## Next Steps
 
 1. **Customize Agent Personality** → Edit `AGENTS.md` and `SOUL.md`
@@ -333,63 +217,93 @@ openclaw logs tail
 
 ---
 
-**Ready for Module 3? Move to [AGENT_PERSONALITY.md](./AGENT_PERSONALITY.md)**
 
 
-# OpenClaw Setup & Configuration Guide
+### Module 3: Agent Personality & Skills (Days 3-4)
 
-## Table of Contents
+**Topics**: Define agent behavior, create instructions, add skills
 
-1. [Installation](#installation)\
-1. [Channel Setup](#channel-setup)
-1. [Agent Configuration](#agent-configuration)
-1. [Advanced Scenarios](#advanced-scenarios)
-1. [Troubleshooting](#troubleshooting)
+1. **Create Agent Instructions** (`AGENTS.md`)
+   - Edit: `~/.openclaw/workspace/AGENTS.md`
+   - Define agent name, role, and behavior
+   - See [AGENT_PERSONALITY.md](./setup/AGENT_PERSONALITY.md) template
 
----
+2. **Add Soul & Consciousness** (`SOUL.md`)
+   - Edit: `~/.openclaw/workspace/SOUL.md`
+   - Define core values and decision-making principles
+   - Example: [workspace/SOUL.md](./workspace/SOUL.md)
 
-## Installation
+3. **Create Skills** (optional but recommended)
+   - Create: `~/.openclaw/workspace/skills/hello-world/SKILL.md`
+   - Skills are reusable agent capabilities
+   - See [workspace/skills/hello-world/SKILL.md](./workspace/skills/hello-world/SKILL.md)
 
-### Prerequisites
+### Module 4: Tools & Capabilities (Days 4-5)
 
-- **Node.js**: [MSI Install here](https://nodejs.org/en/download)
-- **Disk Space**: 500MB minimum, 2GB+ recommended
-- **Memory**: 1GB RAM minimum, 2GB+ recommended
-- **Network**: Internet for LLM API calls; local network or VPN for Gateway access
+**Topics**: Configure tools, set permissions, test execution
 
-#### Windows Installation
+1. **Built-in Tools Overview**
+   - Browser tool for web automation
+   - Bash tool for system commands
+   - File tools for read/write/edit
 
-```bash
-# Install OpenClaw via npm
-npm install -g openclaw@latest
+2. **Configure Tool Policies**
+   - Edit: `~/.openclaw/openclaw.json`
+   - Set sandbox mode and permissions
+   - Example: [CONFIG_EXAMPLES.md](./starter-configs/CONFIG_EXAMPLES.md)
 
-# Run the OpenClaw onboarding process
-openclaw onboard --install-daemon
+3. **Test Tool Access**
+   ```bash
+   openclaw agent --message "List my home directory"
+   openclaw agent --message "What's the weather in San Francisco?"
+   ```
 
-```
----
+### Module 5: First Autonomous Tasks (Days 5-6)
 
-## Channel Setup
+**Topics**: Run your first autonomous agent tasks
 
-### Microsoft Teams
-```bash
-# Install OpenClaw via npm
-npm install -g openclaw@latest
+1. **Simple Information Retrieval**
+   ```bash
+   openclaw agent --message "Find and summarize the latest news about AI"
+   ```
 
-# Run the OpenClaw onboarding process
-openclaw onboard --install-daemon
+2. **File Operations**
+   ```bash
+   openclaw agent --message "Create a TODO list file with today's tasks"
+   ```
 
-# Install the Teams Toolkit CLI 
-npm install -g @microsoft/teams.cli@preview
-teams login
-teams app create --name "OpenClaw" --endpoint "https://<your-tunnel-url>/api/messages"
-teams app get <teamsAppId> --install-link
+3. **Multi-step Tasks**
+   ```bash
+   openclaw agent --message "Search for Python async patterns, \
+                             save the best practices to a file, \
+                             and create a summary"
+   ```
 
-# Install DevTunnels
-Invoke-WebRequest -Uri https://aka.ms/TunnelsCliDownload/win-x64 -OutFile devtunnel.exe
-.\devtunnel user login
-.\devtunnel create app-openclaw --allow-anonymous
-.\devtunnel port create app-openclaw -p 3978 --protocol auto
-.\devtunnel host app-openclaw
+### Module 6: Channel Integration (Days 6-7)
 
-```
+**Topics**: Connect communication channels, interact with agent
+
+1. **Microsoft Teams Integration** (Recommended for Phase 1)
+   - Set up Teams bot
+   - Configure in `openclaw.json`
+   - Test: Send message to bot
+   - See [TEAMS_SETUP.md](./setup/TEAMS_SETUP.md)
+
+2. **Discord Integration** (Alternative)
+   - See [DISCORD_SETUP.md](./setup/DISCORD_SETUP.md)
+
+### Module 7: Memory & Persistence (Day 7)
+
+**Topics**: Set up memory systems, test context retention
+
+1. **Long-term Memory**
+   - Edit: `~/.openclaw/workspace/MEMORY.md`
+   - Add facts and patterns
+   - Test: Recall memory in next session
+
+2. **Session Context**
+   ```bash
+   openclaw agent --message "Remember: I prefer detailed explanations"
+   openclaw agent --message "Explain quantum entanglement"
+   # Agent should use remembered preference
+   ```

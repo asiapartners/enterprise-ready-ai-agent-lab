@@ -128,9 +128,6 @@ az vm create `
 # Get VM public IP
 $publicIp = az vm show --resource-group $resourceGroup --name $vmName --show-details --query publicIps -o tsv
 
-# Open RDP port (3389)
-# az vm open-port --resource-group $resourceGroup --name $vmName --port 3389 --priority 1001
-
 # Connect via RDP
 mstsc /v:$publicIp
 ```
@@ -215,7 +212,7 @@ npm --version
 
 ---
 
-### Step 3: (In Azure VM) Install OpenClaw
+### Step 4: (In Azure VM) Install OpenClaw
 Install OpenClaw via npm:
 
 ```bash
@@ -227,7 +224,54 @@ openclaw --version
 ```
 ---
 
-### Step 4: (In Azure VM) Run Onboarding
+### Step 5: (In Azure VM) Install Dev Tunnels
+Download and install Dev Tunnels, which will be used to expose OpenClaw's messaging endpoint to Microsoft Teams:
+
+```bash
+# Download and Install Dev Tunnels
+Invoke-WebRequest -Uri https://aka.ms/TunnelsCliDownload/win-x64 -OutFile devtunnel.exe
+
+# Login to Dev Tunnels
+.\devtunnel user login
+# Create a tunnel named bot-openclaw with anonymous access
+.\devtunnel create bot-openclaw --allow-anonymous
+
+# Create a port forwarding for port 3978 with automatic protocol detection
+.\devtunnel port create bot-openclaw -p 3978 --protocol auto
+
+# Start hosting the tunnel
+.\devtunnel host bot-openclaw
+
+# Note the URL in the output and retain it for the next step
+  # Connect via browser: TEAMS_MESSAGING_TUNNEL_URL
+```
+---
+
+### Step 6: Set Up Teams App using Microsoft 365 Agents Toolkit
+
+
+```bash
+# Install Microsoft 365 Agents Toolkit
+npm install -g @microsoft/teams.cli@preview
+
+# Login to Microsoft 365
+teams login
+
+# Create Teams app with OpenClaw name and messaging endpoint
+teams app create --name "OpenClaw" --endpoint "https://TEAMS_MESSAGING_TUNNEL_URL/api/messages"
+
+# Save the outputs below somewhere for later use 
+  # CLIENT_ID=<YOUR_CLIENT_ID>
+  # CLIENT_SECRET=<YOUR_CLIENT_SECRET>
+  # TENANT_ID=<YOUR_TENANT_ID>
+
+# Open the output link below in your browser to install the Teams app 
+  # Install in Teams → https://teams.microsoft.com/l/app/....
+```
+
+---
+
+### Step 7: (In Azure VM) Run OpenClaw Onboarding
 
 The interactive onboarding guide will:
 - Create the `~/.openclaw/` directory structure
@@ -275,12 +319,50 @@ openclaw onboard --install-daemon
 # Configure MS Teams channels access?
   # No
 
+# Enter MS Teams App ID
+  # (Paste the CLIENT_ID from Step 6)
 
+# Enter MS Teams App Password
+  # (Paste the CLIENT_SECRET from Step 6)
+
+# Enter MS Teams Tenant ID
+  # (Paste the TENANT_ID from Step 6)
+
+# Enable delegated auth? (required for reactions and write operations)
+  # No
+
+# Search provider
+  # DuckDuckGo Search (experimental)
+
+# Configure skills now? (recommended)
+  # No
+
+# Enable hooks?
+  # Skip for now
+
+# How do you want to hatch your agent?
+  # Hatch in Browser
 ```
 
 ---
 
-### Step 5: Verify Installation
+### Step 8: (In Azure VM) Set up MS Teams pairing
+
+Once OpenClaw is up and running, you will need to grant pairing access to the Teams user before responses can be sent back. This seems to be a bug and may be fixed in future releases.
+
+First, send a message in Teams, and then run the following commands:
+
+```bash
+# List all pending pairing requests from MS Teams
+openclaw pairing list msteams 
+
+# Approve the pairing request using the pairing code received
+openclaw pairing approve msteams PAIRING_CODE
+```
+
+---
+
+### Step 9: Verify Installation
 
 After onboarding, verify everything is working:
 
@@ -293,7 +375,8 @@ openclaw doctor
 # ✓ Gateway can start
 # ✓ Workspace directory exists
 ```
-### (Optional): Review  Directory Structure
+
+####  (Optional): Review  Directory Structure
 
 OpenClaw creates the following structure:
 
@@ -314,92 +397,3 @@ OpenClaw creates the following structure:
 └── cache/                        # Cache directory
 ```
 ---
-
-### Module 3: Agent Personality & Skills (Days 3-4)
-
-**Topics**: Define agent behavior, create instructions, add skills
-
-1. **Create Agent Instructions** (`AGENTS.md`)
-   - Edit: `~/.openclaw/workspace/AGENTS.md`
-   - Define agent name, role, and behavior
-   - See [AGENT_PERSONALITY.md](./setup/AGENT_PERSONALITY.md) template
-
-2. **Add Soul & Consciousness** (`SOUL.md`)
-   - Edit: `~/.openclaw/workspace/SOUL.md`
-   - Define core values and decision-making principles
-   - Example: [workspace/SOUL.md](./workspace/SOUL.md)
-
-3. **Create Skills** (optional but recommended)
-   - Create: `~/.openclaw/workspace/skills/hello-world/SKILL.md`
-   - Skills are reusable agent capabilities
-   - See [workspace/skills/hello-world/SKILL.md](./workspace/skills/hello-world/SKILL.md)
-
-### Module 4: Tools & Capabilities (Days 4-5)
-
-**Topics**: Configure tools, set permissions, test execution
-
-1. **Built-in Tools Overview**
-   - Browser tool for web automation
-   - Bash tool for system commands
-   - File tools for read/write/edit
-
-2. **Configure Tool Policies**
-   - Edit: `~/.openclaw/openclaw.json`
-   - Set sandbox mode and permissions
-   - Example: [CONFIG_EXAMPLES.md](./starter-configs/CONFIG_EXAMPLES.md)
-
-3. **Test Tool Access**
-   ```bash
-   openclaw agent --message "List my home directory"
-   openclaw agent --message "What's the weather in San Francisco?"
-   ```
-
-### Module 5: First Autonomous Tasks (Days 5-6)
-
-**Topics**: Run your first autonomous agent tasks
-
-1. **Simple Information Retrieval**
-   ```bash
-   openclaw agent --message "Find and summarize the latest news about AI"
-   ```
-
-2. **File Operations**
-   ```bash
-   openclaw agent --message "Create a TODO list file with today's tasks"
-   ```
-
-3. **Multi-step Tasks**
-   ```bash
-   openclaw agent --message "Search for Python async patterns, \
-                             save the best practices to a file, \
-                             and create a summary"
-   ```
-
-### Module 6: Channel Integration (Days 6-7)
-
-**Topics**: Connect communication channels, interact with agent
-
-1. **Microsoft Teams Integration** (Recommended for Phase 1)
-   - Set up Teams bot
-   - Configure in `openclaw.json`
-   - Test: Send message to bot
-   - See [TEAMS_SETUP.md](./setup/TEAMS_SETUP.md)
-
-2. **Discord Integration** (Alternative)
-   - See [DISCORD_SETUP.md](./setup/DISCORD_SETUP.md)
-
-### Module 7: Memory & Persistence (Day 7)
-
-**Topics**: Set up memory systems, test context retention
-
-1. **Long-term Memory**
-   - Edit: `~/.openclaw/workspace/MEMORY.md`
-   - Add facts and patterns
-   - Test: Recall memory in next session
-
-2. **Session Context**
-   ```bash
-   openclaw agent --message "Remember: I prefer detailed explanations"
-   openclaw agent --message "Explain quantum entanglement"
-   # Agent should use remembered preference
-   ```
