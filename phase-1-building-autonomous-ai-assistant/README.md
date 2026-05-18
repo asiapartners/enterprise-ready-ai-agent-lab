@@ -2,16 +2,7 @@
 
 ## Overview
 
-In Phase 1, you will build a **foundational autonomous AI assistant** deployed on user-managed hardware. This phase focuses on creating a self-hosted, local-first AI agent that can:
-
-- 🤖 Execute autonomous tasks using connected tools
-- 🔐 Run securely on your own infrastructure
-- 💬 Communicate through Microsoft Teams
-- 🛠️ Access and control system tools within defined perimeter boundaries
-- 📚 Maintain memory and context across sessions
-- 🔄 Manage task execution without human intervention
-
-This lab is based on **OpenClaw**, a production-ready personal AI assistant framework that demonstrates enterprise-ready AI agent patterns.
+In Phase 1, you will build a **foundational autonomous AI assistant** deployed on user-managed hardware.
 
 ---
 
@@ -23,16 +14,10 @@ By the end of Phase 1, you will:
 2. **Set up a local AI assistant** - Install and configure OpenClaw on your machine
 3. **Create agent personality and capabilities** - Define your agent's skills, instructions, and tool access
 4. **Connect communication channels** - Integrate with Microsoft Teams to interact with your agent
-5. **Build and execute custom tools** - Create tools your agent can autonomously call
-6. **Implement memory systems** - Set up persistent context and knowledge retention
-7. **Define capability perimeters** - Establish security boundaries for what your agent can access
-8. **Observe and debug** - Monitor agent behavior and troubleshoot issues
 
 ---
 
-## Key Concepts
-
-### 1. **Autonomous Agent Architecture**
+## Autonomous Agent Architecture
 
 An autonomous AI agent has three core components:
 
@@ -64,360 +49,351 @@ An autonomous AI agent has three core components:
 │  • Custom plugins                       │
 └─────────────────────────────────────────┘
 ```
+---
 
-### 2. **Session Model**
+## Phase 1 Setup Steps - Detailed Installation Guide
 
-Every conversation is a **session** with:
-- **Isolated context** - Each session maintains its own conversation history
-- **Tool policies** - Sessions can have different tool access levels
-- **Sub-agent spawning** - Sessions can delegate to other agents
-- **Persistence** - Sessions can be resumed with full context
+### Prerequisites
 
-### 3. **Tool Policies & Perimeters**
+Before you start, ensure you have:
 
-Define what your agent can do:
+- [ ] [az cli](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?view=azure-cli-latest) installed 
+- [ ] [Microsoft 365 Agents Toolkit](https://learn.microsoft.com/en-us/microsoftteams/platform/toolkit/install-agents-toolkit?tabs=vscode) installed
+- [ ] Permissions to deploy Azure resources 
+  - [ ] A Windows 11 Azure VM (D4s v5)
+  - [ ] Configure outbound internet connectivity (NAT Gateway, public IP)
+  - [ ] RDP connectivity (Remote Desktop or Azure Bastion)
+  - [ ] An Azure OpenAI resource
 
-```yaml
-tool_policies:
-  viewer:           # Read-only access
-    - read
-    - list
-  developer:        # Development/execution
-    - read
-    - write
-    - bash
-    - edit
-  admin:           # Full system access
-    - "*"
+
+
+### Step 1: Deploy Windows Virtual Machine in Azure
+
+Create a Windows VM to host the OpenClaw agent:
+
+```powershell
+# Set variables
+$resourceGroup = "openclaw-rg"
+$location = "eastus2"
+$vnetName = "openclaw-vnet"
+$subnetName = "openclaw-subnet"
+$vmName = "openclaw-vm"
+$vmSize = "Standard_D4s_v5"
+$imageName = "MicrosoftWindowsDesktop:windows-11:win11-25h2-pro:latest"
+
+# Login to your Azure subscription
+# az login
+
+# Create resource group
+az group create --name $resourceGroup --location $location
+
+# Create Virtual Network
+az network vnet create `
+  --resource-group $resourceGroup `
+  --name $vnetName `
+  --address-prefix 10.0.0.0/16 `
+  --subnet-name $subnetName `
+  --subnet-prefix 10.0.1.0/24
+
+# Create Network Security Group
+$nsgName = "openclaw-nsg"
+az network nsg create `
+  --resource-group $resourceGroup `
+  --name $nsgName
+
+# Add RDP rule to NSG
+az network nsg rule create `
+  --resource-group $resourceGroup `
+  --nsg-name $nsgName `
+  --name allow-rdp `
+  --priority 1000 `
+  --source-address-prefixes '*' `
+  --source-port-ranges '*' `
+  --destination-address-prefixes '*' `
+  --destination-port-ranges 3389 `
+  --access Allow `
+  --protocol Tcp
+
+# Create Windows VM
+az vm create `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --image $imageName `
+  --size $vmSize `
+  --admin-username azureuser `
+  --admin-password YourSecurePassword123! `
+  --public-ip-sku Standard `
+  --output json
+
+# Get VM public IP
+$publicIp = az vm show --resource-group $resourceGroup --name $vmName --show-details --query publicIps -o tsv
+
+# Connect via RDP
+mstsc /v:$publicIp
 ```
 
-### 4. **Memory System**
-
-Agents maintain three types of memory:
-
-| Memory Type | Purpose | Example |
-|------------|---------|---------|
-| **Conversation** | Current session context | Last 10 messages in chat |
-| **Long-term** (MEMORY.md) | Persistent facts & patterns | "User prefers email updates" |
-| **Episodic** (Daily) | Daily notes & observations | "User was debugging async/await" |
+**VM Details:**
+- **Image:** Windows 11 Pro 25H2 (`MicrosoftWindowsDesktop:windows-11:win11-25h2-pro:latest`)
+- **Size:** Standard_D4s_v5 (4 vCPUs, 16 GB RAM)
+- **Location:** East US 2 (adjust as needed; check SKU availability with `az vm list-skus --location <region> --size Standard_D4s_v5`)
+- **Note:** Change the admin password to a secure value before deploying
 
 ---
 
-## Phase 1 Prerequisites
+### Step 2: Deploy Azure OpenAI Resource
 
-### System Requirements
+Deploy an Azure OpenAI resource:
 
-- **OS**: macOS, Linux, or Windows (WSL2 recommended)
-- **RAM**: 4GB minimum (8GB+ recommended)
-- **Disk**: 2GB available space
-- **Node.js**: v22.14+ or v24+
-- **Internet**: Required for LLM APIs
-- **Recommended Azure VM (cloud option)**:
-   - **Linux**: `Standard_D4s_v5` (4 vCPU, 16 GiB RAM), Ubuntu 22.04 LTS
-   - **Windows**: `Standard_D4s_v5` (4 vCPU, 16 GiB RAM), Windows Server 2022
-   - **Minimum acceptable for light testing**: `Standard_D2s_v5` (2 vCPU, 8 GiB RAM)
+```powershell
+# Set variables
+$resourceGroup = "openclaw-rg"
+$openaiName = "openclaw-openai"
+$location = "eastus2"
+$skuName = "S0"
 
-### Required Accounts
+# Create Azure OpenAI resource
+az cognitiveservices account create `
+  --name $openaiName `
+  --resource-group $resourceGroup `
+  --kind OpenAI `
+  --sku $skuName `
+  --location $location `
+  --yes
 
-1. **LLM Provider** (pick one):
-   - OpenAI (ChatGPT API)
-   - Anthropic (Claude API)
-   - Azure OpenAI
-   - or other OpenAI-compatible API
+# Get the API key and endpoint
+$apiKey = az cognitiveservices account keys list --name $openaiName --resource-group $resourceGroup --query key1 -o tsv
+$endpoint = az cognitiveservices account show --name $openaiName --resource-group $resourceGroup --query properties.endpoint -o tsv
 
-2. **Communication Channel** (optional for Phase 1, required for Phase 2):
-   - Microsoft Teams workspace
+# Display credentials for later use
+Write-Host "API Key: $apiKey"
+Write-Host "Endpoint: $endpoint"
+```
 
-### Skills Needed
+**Deploy a Model:**
 
-- Basic terminal/command line usage
-- JSON/YAML configuration editing
-- Understanding of environment variables
-- Basic API concepts
+```powershell
+# Deploy GPT-5.4-mini model (generally available in eastus2)
+az cognitiveservices account deployment create `
+  --name $openaiName `
+  --resource-group $resourceGroup `
+  --deployment-name "gpt-5.4-mini" `
+  --model-name "gpt-5.4-mini" `
+  --model-version "2026-03-17" `
+  --model-format "OpenAI" `
+  --sku-name "GlobalStandard" `
+  --sku-capacity 10
+```
 
----
-
-## Phase 1 Structure
-
-### Module 1: Foundation (Days 1-2)
-
-**Topics**: Architecture, concepts, prerequisites
-
-1. Read [OPENCLAW_ARCHITECTURE.md](../OPENCLAW_ARCHITECTURE.md)
-2. Read [OPENCLAW_SETUP_GUIDE.md](../OPENCLAW_SETUP_GUIDE.md) - Installation section
-3. Verify prerequisites
-
-### Module 2: Installation & Setup (Days 2-3)
-
-**Topics**: Install OpenClaw, configure LLM, initialize workspace
-
-1. **Install OpenClaw**
-   ```bash
-   npm install -g openclaw@latest
-   openclaw onboard --install-daemon
-   ```
-   See [SETUP_STEPS.md](./setup/SETUP_STEPS.md) for detailed instructions
-
-2. **Configure Your LLM Provider**
-   - Choose an LLM provider (OpenAI, Anthropic, or other)
-   - Get an API key
-   - Update `~/.openclaw/openclaw.json`
-   - See [LLM_PROVIDER_CONFIG.md](./setup/LLM_PROVIDER_CONFIG.md)
-
-3. **Initialize Workspace**
-   ```bash
-   openclaw setup
-   ```
-   Creates: `~/.openclaw/workspace/`
-
-### Module 3: Agent Personality & Skills (Days 3-4)
-
-**Topics**: Define agent behavior, create instructions, add skills
-
-1. **Create Agent Instructions** (`AGENTS.md`)
-   - Edit: `~/.openclaw/workspace/AGENTS.md`
-   - Define agent name, role, and behavior
-   - See [AGENT_PERSONALITY.md](./setup/AGENT_PERSONALITY.md) template
-
-2. **Add Soul & Consciousness** (`SOUL.md`)
-   - Edit: `~/.openclaw/workspace/SOUL.md`
-   - Define core values and decision-making principles
-   - Example: [workspace/SOUL.md](./workspace/SOUL.md)
-
-3. **Create Skills** (optional but recommended)
-   - Create: `~/.openclaw/workspace/skills/hello-world/SKILL.md`
-   - Skills are reusable agent capabilities
-   - See [workspace/skills/hello-world/SKILL.md](./workspace/skills/hello-world/SKILL.md)
-
-### Module 4: Tools & Capabilities (Days 4-5)
-
-**Topics**: Configure tools, set permissions, test execution
-
-1. **Built-in Tools Overview**
-   - Browser tool for web automation
-   - Bash tool for system commands
-   - File tools for read/write/edit
-
-2. **Configure Tool Policies**
-   - Edit: `~/.openclaw/openclaw.json`
-   - Set sandbox mode and permissions
-   - Example: [CONFIG_EXAMPLES.md](./starter-configs/CONFIG_EXAMPLES.md)
-
-3. **Test Tool Access**
-   ```bash
-   openclaw agent --message "List my home directory"
-   openclaw agent --message "What's the weather in San Francisco?"
-   ```
-
-### Module 5: First Autonomous Tasks (Days 5-6)
-
-**Topics**: Run your first autonomous agent tasks
-
-1. **Simple Information Retrieval**
-   ```bash
-   openclaw agent --message "Find and summarize the latest news about AI"
-   ```
-
-2. **File Operations**
-   ```bash
-   openclaw agent --message "Create a TODO list file with today's tasks"
-   ```
-
-3. **Multi-step Tasks**
-   ```bash
-   openclaw agent --message "Search for Python async patterns, \
-                             save the best practices to a file, \
-                             and create a summary"
-   ```
-
-### Module 6: Channel Integration (Days 6-7)
-
-**Topics**: Connect communication channels, interact with agent
-
-1. **Microsoft Teams Integration** (Recommended for Phase 1)
-   - Set up Teams bot
-   - Configure in `openclaw.json`
-   - Test: Send message to bot
-   - See [TEAMS_SETUP.md](./setup/TEAMS_SETUP.md)
-
-2. **Discord Integration** (Alternative)
-   - See [DISCORD_SETUP.md](./setup/DISCORD_SETUP.md)
-
-### Module 7: Memory & Persistence (Day 7)
-
-**Topics**: Set up memory systems, test context retention
-
-1. **Long-term Memory**
-   - Edit: `~/.openclaw/workspace/MEMORY.md`
-   - Add facts and patterns
-   - Test: Recall memory in next session
-
-2. **Session Context**
-   ```bash
-   openclaw agent --message "Remember: I prefer detailed explanations"
-   openclaw agent --message "Explain quantum entanglement"
-   # Agent should use remembered preference
-   ```
+**Azure OpenAI Details:**
+- **Location:** East US 2 (same as VM for optimal latency)
+- **SKU:** Standard S0 (pay-as-you-go pricing)
+- **Models:** Deploy GPT-5.4-mini (generally available in eastus2)
+- **Note:** Save the API key and endpoint for configuration in Step 5
 
 ---
 
-## Lab Deliverables
+### Step 3: (In Azure VM) Install Node.js
 
-### By End of Phase 1, You Will Have:
+From the remote VM, download and install Node.js from the official website:
 
-✅ **Installation & Configuration**
-- Installed OpenClaw locally
-- Configured LLM provider (OpenAI, Anthropic, or other)
-- Initialized agent workspace
-
-✅ **Agent Personality**
-- Created `AGENTS.md` with agent role and instructions
-- Created `SOUL.md` with core principles
-- (Optional) Created at least one custom skill
-
-✅ **Tools & Execution**
-- Configured tool policies
-- Tested 5+ autonomous agent tasks
-- Demonstrated tool execution (files, bash, browser)
-
-✅ **Communication**
-- Integrated with Microsoft Teams
-- Successfully sent and received messages through Teams
-- Demonstrated agent autonomously responding to messages
-
-✅ **Memory**
-- Created long-term memory entries
-- Demonstrated context retention across sessions
-- Verified agent uses persisted knowledge
-
-✅ **Documentation**
-- Created README for your specific setup
-- Documented your agent's capabilities
-- Created troubleshooting guide for common issues
-
----
-
-## Quick Start (TL;DR)
-
-For experienced users wanting to get started immediately:
+1. Visit https://nodejs.org/
+2. Download the **LTS (Long Term Support)** version MSI installer for Windows
+3. Run the MSI installer and follow the installation wizard
+4. Accept the default settings (includes npm)
+5. Verify installation:
 
 ```bash
-# 1. Install
+# Check Node.js version
+node --version
+
+# Check npm version
+npm --version
+```
+
+---
+
+### Step 4: (In Azure VM) Install OpenClaw
+Install OpenClaw via npm:
+
+```bash
+# Install latest stable version
 npm install -g openclaw@latest
 
-# 2. Onboard (interactive setup)
+# Verify installation
+openclaw --version
+```
+---
+
+### Step 5: (In Azure VM) Install Dev Tunnels
+Download and install Dev Tunnels, which will be used to expose OpenClaw's messaging endpoint to Microsoft Teams:
+
+```bash
+# Download and Install Dev Tunnels
+Invoke-WebRequest -Uri https://aka.ms/TunnelsCliDownload/win-x64 -OutFile devtunnel.exe
+
+# Login to Dev Tunnels
+.\devtunnel user login
+# Create a tunnel named bot-openclaw with anonymous access
+.\devtunnel create bot-openclaw --allow-anonymous
+
+# Create a port forwarding for port 3978 with automatic protocol detection
+.\devtunnel port create bot-openclaw -p 3978 --protocol auto
+
+# Start hosting the tunnel
+.\devtunnel host bot-openclaw
+
+# Note the URL in the output and retain it for the next step
+  # Connect via browser: TEAMS_MESSAGING_TUNNEL_URL
+```
+---
+
+### Step 6: Set Up Teams App using Microsoft 365 Agents Toolkit
+
+
+```bash
+# Install Microsoft 365 Agents Toolkit
+npm install -g @microsoft/teams.cli@preview
+
+# Login to Microsoft 365
+teams login
+
+# Create Teams app with OpenClaw name and messaging endpoint
+teams app create --name "OpenClaw" --endpoint "https://TEAMS_MESSAGING_TUNNEL_URL/api/messages"
+
+# Save the outputs below somewhere for later use 
+  # CLIENT_ID=<YOUR_CLIENT_ID>
+  # CLIENT_SECRET=<YOUR_CLIENT_SECRET>
+  # TENANT_ID=<YOUR_TENANT_ID>
+
+# Open the output link below in your browser to install the Teams app 
+  # Install in Teams → https://teams.microsoft.com/l/app/....
+```
+
+---
+
+### Step 7: (In Azure VM) Run OpenClaw Onboarding
+
+The interactive onboarding guide will:
+- Create the `~/.openclaw/` directory structure
+- Prompt for LLM configuration
+- Optionally set up Microsoft Teams channel
+- Set up the daemon service
+
+```bash
+# Start onboarding
 openclaw onboard --install-daemon
 
-# 3. Configure your LLM provider
-# Edit: ~/.openclaw/openclaw.json
-# Set your API key from OpenAI/Anthropic/other
+# I understand this is personal-by-default and shared/multi-user use requires lock-down. Continue?
+  # Yes
 
-# 4. Define agent personality
-# Edit: ~/.openclaw/workspace/AGENTS.md
-# Edit: ~/.openclaw/workspace/SOUL.md
+# Setup mode
+  # QuickStart (recommended)
 
-# 5. Test a simple task
-openclaw agent --message "Hello! Who are you?"
+# Model/auth provider
+  # More... >> Custom Provider
 
-# 6. Set up Microsoft Teams channel
-# Edit: ~/.openclaw/openclaw.json
-# Add your Teams bot credentials
+# API Base URL
+  # (Paste the Endpoint from Step 2)
 
-# 7. Start the gateway
-openclaw gateway --port 18789 --verbose
+# How do you want to provide this API key?
+  # Paste API key now
+  
+# API Key (leave blank if not required)
+  # (Paste the API Key from Step 2)
+
+# Endpoint compatibility
+  # OpenAI-compatible
+
+# Model ID
+  # gpt-5.4-mini
+
+# Endpoint ID
+  # (Accept default)
+
+# Model alias (optional)
+  # gpt-5.4-mini
+
+# Select channel (QuickStart)
+  # Microsoft Teams (Teams SDK)
+
+# Configure MS Teams channels access?
+  # No
+
+# Enter MS Teams App ID
+  # (Paste the CLIENT_ID from Step 6)
+
+# Enter MS Teams App Password
+  # (Paste the CLIENT_SECRET from Step 6)
+
+# Enter MS Teams Tenant ID
+  # (Paste the TENANT_ID from Step 6)
+
+# Enable delegated auth? (required for reactions and write operations)
+  # No
+
+# Search provider
+  # DuckDuckGo Search (experimental)
+
+# Configure skills now? (recommended)
+  # No
+
+# Enable hooks?
+  # Skip for now
+
+# How do you want to hatch your agent?
+  # Hatch in Browser
 ```
 
 ---
 
-## File Structure
+### Step 8: (In Azure VM) Set up MS Teams pairing
 
-```
-phase-1-building-autonomous-ai-assistant/
-├── README.md                           # This file
-├── INDEX.md                            # Navigation hub
-├── IMPLEMENTATION_SUMMARY.md           # Phase 1 summary
-├── setup/
-│   ├── SETUP_STEPS.md                  # Detailed installation guide
-│   ├── LLM_PROVIDER_CONFIG.md          # LLM configuration
-│   ├── AGENT_PERSONALITY.md            # Agent instructions template
-│   ├── TEAMS_SETUP.md                  # Microsoft Teams integration
-│   └── DISCORD_SETUP.md               # Discord integration
-├── starter-configs/
-│   └── CONFIG_EXAMPLES.md              # Full config examples
-├── workspace/
-│   ├── AGENTS.md                       # Example agent definitions
-│   ├── SOUL.md                         # Example agent soul
-│   ├── MEMORY.md                       # Example memory entries
-│   └── skills/
-│       └── hello-world/
-│           └── SKILL.md                # Example skill
-└── TROUBLESHOOTING.md                  # Common issues & solutions
+Once OpenClaw is up and running, you will need to grant pairing access to the Teams user before responses can be sent back. This seems to be a bug and may be fixed in future releases.
+
+First, send a message in Teams, and then run the following commands:
+
+```bash
+# List all pending pairing requests from MS Teams
+openclaw pairing list msteams 
+
+# Approve the pairing request using the pairing code received
+openclaw pairing approve msteams PAIRING_CODE
 ```
 
 ---
 
-## Next: Phase 2 & 3
+### Step 9: Verify Installation
 
-After completing Phase 1:
+After onboarding, verify everything is working:
 
-- **[Phase 2: Tool Integration & Capability Perimeters](../phase-2-tool-integration-capability-perimeters/README.md)**
-  - Connect to Microsoft 365 APIs and external services
-  - Define safety boundaries and network policies
-  - Implement approval workflows
-  - Govern agent actions through Microsoft Agent 365
+```bash
+# Check configuration is valid
+openclaw doctor
 
-- **[Phase 3: Multi-Agent Orchestration & Enterprise Governance](../phase-3-multi-agent-orchestration-governance/README.md)**
-  - Build multi-agent systems
-  - Implement delegation patterns
-  - Enterprise monitoring and logging
-  - Advanced security & compliance
+# You should see:
+# ✓ Configuration loaded
+# ✓ Gateway can start
+# ✓ Workspace directory exists
+```
 
+####  (Optional): Review  Directory Structure
+
+OpenClaw creates the following structure:
+
+```
+~/.openclaw/                      # Config root
+├── openclaw.json                 # Main configuration
+├── workspace/                    # Agent workspace
+│   ├── AGENTS.md                 # Agent definitions
+│   ├── SOUL.md                   # Agent soul/values
+│   ├── TOOLS.md                  # Tools registry
+│   ├── MEMORY.md                 # Long-term memory
+│   ├── skills/                   # Skills directory
+│   │   └── <skill-name>/
+│   │       └── SKILL.md
+│   └── sessions/                 # Session data (auto-created)
+├── data/                         # Data storage
+├── logs/                         # Log files
+└── cache/                        # Cache directory
+```
 ---
-
-## Resources & Support
-
-### Additional Reference Materials
-- [OPENCLAW_ARCHITECTURE.md](../OPENCLAW_ARCHITECTURE.md) - Deep dive into internals
-- [OPENCLAW_SETUP_GUIDE.md](../OPENCLAW_SETUP_GUIDE.md) - Comprehensive setup
-- [OPENCLAW_IMPLEMENTATION_GUIDE.md](../OPENCLAW_IMPLEMENTATION_GUIDE.md) - Advanced patterns
-
-### Community
-- [Microsoft Teams Bot Documentation](https://learn.microsoft.com/en-us/microsoftteams/platform/bots/what-are-bots)
-- [GitHub Issues](https://github.com/openclaw/openclaw/issues)
-- [Discussions](https://github.com/openclaw/openclaw/discussions)
-
-### Troubleshooting
-- See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
-- Check OpenClaw logs: `openclaw doctor`
-
----
-
-## Time Estimates
-
-| Module | Duration | Effort |
-|--------|----------|--------|
-| Module 1: Foundation | 2-3 hours | Easy - Reading |
-| Module 2: Installation | 1-2 hours | Easy - Follow steps |
-| Module 3: Personality | 1-2 hours | Medium - Creative |
-| Module 4: Tools | 1-2 hours | Medium - Configuration |
-| Module 5: First Tasks | 2-3 hours | Medium - Experimentation |
-| Module 6: Channels | 2-3 hours | Medium - Setup |
-| Module 7: Memory | 1-2 hours | Medium - Configuration |
-| **Total Phase 1** | **10-17 hours** | **Medium** |
-
----
-
-## Success Criteria
-
-✅ You've successfully completed Phase 1 when:
-
-1. OpenClaw is installed and running
-2. Your agent responds to a message with "Hello"
-3. Your agent successfully executes a tool (file read, bash command, or web request)
-4. You can send and receive messages through a connected channel
-5. Your agent uses long-term memory to recall information
-6. You have documented your agent's capabilities and setup
-
----
-
-**Ready to build your AI assistant? Start with [setup/SETUP_STEPS.md](./setup/SETUP_STEPS.md)!**

@@ -38,5 +38,4 @@ This lab uses:
 
 ## Additional References
 
-- **[OPENCLAW_ARCHITECTURE.md](./reference/OPENCLAW_ARCHITECTURE.md)** - Deep dive into agent architecture
 - **[OpenClaw Official Docs](https://docs.openclaw.ai)** - Complete documentation
