@@ -138,6 +138,9 @@ mstsc /v:$publicIp
 - **Location:** East US 2 (adjust as needed; check SKU availability with `az vm list-skus --location <region> --size Standard_D4s_v5`)
 - **Note:** Change the admin password to a secure value before deploying
 
+✅ **SUCCESS CRITERIA FOR STEP 1:**
+[ ] You can successfully RDP into your Azure Virtual Machine
+
 ---
 
 ### Step 2: Deploy Azure OpenAI Resource
@@ -190,6 +193,10 @@ az cognitiveservices account deployment create `
 - **Models:** Deploy GPT-5.4-mini (generally available in eastus2)
 - **Note:** Save the API key and endpoint for configuration in Step 5
 
+✅ **SUCCESS CRITERIA FOR STEP 2:**
+[ ] You can send a request to your Azure OpenAI endpoint
+
+
 ---
 
 ### Step 3: (In Azure VM) Install Node.js
@@ -209,6 +216,8 @@ node --version
 # Check npm version
 npm --version
 ```
+✅ **SUCCESS CRITERIA FOR STEP 3:**
+[ ] `node` and `npm` commands produce a valid output
 
 ---
 
@@ -222,6 +231,9 @@ npm install -g openclaw@latest
 # Verify installation
 openclaw --version
 ```
+✅ **SUCCESS CRITERIA FOR STEP 4:**
+[ ] `openclaw` command produces a valid output
+
 ---
 
 ### Step 5: (In Azure VM) Install Dev Tunnels
@@ -245,6 +257,10 @@ Invoke-WebRequest -Uri https://aka.ms/TunnelsCliDownload/win-x64 -OutFile devtun
 # Note the URL in the output and retain it for the next step
   # Connect via browser: TEAMS_MESSAGING_TUNNEL_URL
 ```
+
+✅ **SUCCESS CRITERIA FOR STEP 5:**
+[ ] You have saved the TEAMS_MESSAGING_TUNNEL_URL in a handy location, like Notepad
+
 ---
 
 ### Step 6: Set Up Teams App using Microsoft 365 Agents Toolkit
@@ -268,6 +284,9 @@ teams app create --name "OpenClaw" --endpoint "https://TEAMS_MESSAGING_TUNNEL_UR
 # Open the output link below in your browser to install the Teams app 
   # Install in Teams → https://teams.microsoft.com/l/app/....
 ```
+
+✅ **SUCCESS CRITERIA FOR STEP 6:**
+[ ] The Teams app is visible in Microsoft Teams. *It does not need to respond to you yet.*
 
 ---
 
@@ -341,8 +360,16 @@ openclaw onboard --install-daemon
   # Skip for now
 
 # How do you want to hatch your agent?
-  # Hatch in Browser
+  # Hatch in Terminal (Recommended)
+
+# Test the agent
+  # openclaw agent --message "Hello! Who are you?"
 ```
+
+✅ **SUCCESS CRITERIA FOR STEP 7:**
+
+- [ ] Openclaw responds to your agent message
+- [ ] You can access the browser dashboard with the command `openclaw dashboard`
 
 ---
 
@@ -360,40 +387,9 @@ openclaw pairing list msteams
 openclaw pairing approve msteams PAIRING_CODE
 ```
 
+✅ **SUCCESS CRITERIA FOR STEP 8:**
+[ ] Openclaw now responds to your messages in Teams
+
 ---
 
-### Step 9: Verify Installation
-
-After onboarding, verify everything is working:
-
-```bash
-# Check configuration is valid
-openclaw doctor
-
-# You should see:
-# ✓ Configuration loaded
-# ✓ Gateway can start
-# ✓ Workspace directory exists
-```
-
-####  (Optional): Review  Directory Structure
-
-OpenClaw creates the following structure:
-
-```
-~/.openclaw/                      # Config root
-├── openclaw.json                 # Main configuration
-├── workspace/                    # Agent workspace
-│   ├── AGENTS.md                 # Agent definitions
-│   ├── SOUL.md                   # Agent soul/values
-│   ├── TOOLS.md                  # Tools registry
-│   ├── MEMORY.md                 # Long-term memory
-│   ├── skills/                   # Skills directory
-│   │   └── <skill-name>/
-│   │       └── SKILL.md
-│   └── sessions/                 # Session data (auto-created)
-├── data/                         # Data storage
-├── logs/                         # Log files
-└── cache/                        # Cache directory
-```
----
+**That's it, you're done! You've completed Phase 1!**
